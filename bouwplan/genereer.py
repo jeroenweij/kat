@@ -502,16 +502,17 @@ def nest(items, w, h, kerf=4, rotate=True, tries=4000):
 
 
 # handelslengtes per lat met prijs uit de Inkoop-tab
+LONG_FIXED = {"B69": 5}   # mix uit de Inkoop-tab; andere mixen schelen maar een paar cent
 STOCK = {"R44": {3600: 5.29, 2400: 3.55}, "B69": {3600: 6.49, 3000: 5.40, 2400: 4.30}, "I69": {3600: 6.75},
          "P69": {1800: 6.69}, "LAT": {2500: 5.49}}
 
 
-def bars(items, stocks, kerf=4, margin=10):
-    """Eerst n_long lange latten, daarna korte; houdt de goedkoopste indeling, met een kleine toeslag per stuk. margin: tolerantie Hornbach."""
+def bars(items, stocks, kerf=4, margin=10, n_fixed=None):
+    """Eerst n_long lange latten, daarna korte; houdt de goedkoopste indeling, of n_fixed lange. margin: tolerantie Hornbach."""
     items = sorted(items, key=lambda i: -i[0])
     lens = sorted(stocks, reverse=True)
     best = None
-    for n_long in range(len(items) + 1):
+    for n_long in ([n_fixed] if n_fixed is not None else range(len(items) + 1)):
         out = []
         for l, name in items:
             for bar in out:
@@ -526,7 +527,7 @@ def bars(items, stocks, kerf=4, margin=10):
                     break
                 out.append({"cuts": [(l, name)], "left": stock - l, "stock": stock})
         if out:
-            cost = sum(stocks[b_["stock"]] for b_ in out) + 0.2 * len(out)   # bij bijna gelijke prijs: minder stukken
+            cost = sum(stocks[b_["stock"]] for b_ in out)
             if best is None or cost < best[0] - 1e-9:
                 best = (cost, out)
     return best[1]
@@ -541,7 +542,7 @@ def collect():
     res = {}
     short = lambda r: r["group"][0] + ":" + r["name"]
     for key, stocks in STOCK.items():
-        res[key] = bars([(r["dims"][0], short(r)) for r in by[m.MAT[key]]], stocks)
+        res[key] = bars([(r["dims"][0], short(r)) for r in by[m.MAT[key]]], stocks, n_fixed=LONG_FIXED.get(key))
     res["LP9"] = nest([(r["dims"][0], r["dims"][1], short(r)) for r in by[m.MAT["LP9"]]], 2440, 1220, tries=60000)
     res["BP12"] = nest([(r["dims"][0], r["dims"][1], short(r)) for r in by[m.MAT["BP12"]]], 2500, 1250)
     res["OSB"] = nest([(r["dims"][0], r["dims"][1], short(r)) for r in by[m.MAT["OSB"]]], 2440, 1220)
