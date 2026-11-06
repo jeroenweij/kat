@@ -1115,9 +1115,9 @@ AcDbViewportTableRecord
  21
 1
  12
-196.2052519771026
+201.5281841743481
  22
-70.21293444574356
+75.57306906538055
  13
 0
  23
@@ -1143,7 +1143,7 @@ AcDbViewportTableRecord
  37
 0
  40
-42.73830792349607
+62.82011366059758
  41
 1.864661654135338
  42
@@ -4105,6 +4105,78 @@ AcDbLine
  21
 123
   0
+LINE
+  5
+76
+100
+AcDbEntity
+  8
+Extra strengt piece
+  6
+ByLayer
+ 62
+  256
+370
+   -1
+100
+AcDbLine
+ 10
+387.7106781186548
+ 20
+123
+ 11
+385.7106781186548
+ 21
+125
+  0
+LINE
+  5
+77
+100
+AcDbEntity
+  8
+Extra strengt piece
+  6
+ByLayer
+ 62
+  256
+370
+   -1
+100
+AcDbLine
+ 10
+385.7106781186548
+ 20
+125
+ 11
+315
+ 21
+125
+  0
+LINE
+  5
+78
+100
+AcDbEntity
+  8
+Extra strengt piece
+  6
+ByLayer
+ 62
+  256
+370
+   -1
+100
+AcDbLine
+ 10
+315
+ 20
+125
+ 11
+317
+ 21
+123
+  0
 ENDSEC
   0
 SECTION
@@ -4137,7 +4209,7 @@ AcDbDictionary
   0
 PLOTSETTINGS
   5
-76
+79
 100
 AcDbPlotSettings
   6
