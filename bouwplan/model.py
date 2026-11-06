@@ -83,7 +83,7 @@ def mid(a, b):
 FLOOR_X = (F0, mid(F0, PART_X0), PART_X0, mid(PART_X1, XB), XB)   # vloerframe en achterwand beneden
 MID_X = (F0, HOLE_X1, PART_X0, FLOOR_X[3], XB)                         # tussenvloer
 BACK_U = tuple(round(F0 + i * (XB - F0) / 4) for i in range(5))        # achterwand boven, plafond, sporen
-SIDE_Y = (F1, mid(F1, YB0 - S), YB0 - S)                                # stijlen zijwanden
+SIDE_Y = (F1, mid(F1, IN_Y1 - S), IN_Y1 - S)                                # stijlen zijwanden
 
 
 def roof_z(y):
@@ -187,22 +187,21 @@ g = "C Achterwand beneden"
 wall_x(g, YB0, YB1, Z0, FLOOR_X)
 for a, b in zip(FLOOR_X, FLOOR_X[1:]):
     add_pir("PIR wand", g, a + S, b, YB0, YB1, Z0 + S, Z1 - S)
-add("Binnenplaat trapkamer", g, "LP9", IN_X0, ROOM_X1, IN_Y1, YB0, Z0, Z1)
-add("Binnenplaat veranda", g, "LP9", VER_X0, IN_X1, IN_Y1, YB0, Z0, Z1)
+add("Binnenplaat", g, "LP9", F0, XR1, IN_Y1, YB0, Z0, Z1, note="volle breedte, uit een stuk: geeft houvast in de hoeken")
 
 g = "D Linkerwand beneden"
-wall_y(g, F0, XL1, F1, YB0, Z0, SIDE_Y)
+wall_y(g, F0, XL1, F1, IN_Y1, Z0, SIDE_Y)
 for a, b in zip(SIDE_Y, SIDE_Y[1:]):
     add_pir("PIR wand", g, F0, XL1, a + S, b, Z0 + S, Z1 - S)
 add("Binnenplaat", g, "LP9", XL1, IN_X0, IN_Y0, IN_Y1, Z0, Z1)
 
 g = "E Scheidingswand"
 CAT_H = 260
-CAT_Y1 = YB0 - S              # 636
-CAT_Y0 = CAT_Y1 - 190         # 446
+CAT_Y1 = IN_Y1 - S            # 627
+CAT_Y0 = CAT_Y1 - 190         # 437
 add("Onderregel voorste deel", g, "R44", PART_X0, PART_X1, F1, CAT_Y0, Z0, Z0 + S)
-add("Onderregel achterste deel", g, "R44", PART_X0, PART_X1, CAT_Y1, YB0, Z0, Z0 + S)
-add("Bovenregel", g, "R44", PART_X0, PART_X1, F1, YB0, Z1 - S, Z1)
+add("Onderregel achterste deel", g, "R44", PART_X0, PART_X1, CAT_Y1, IN_Y1, Z0, Z0 + S)
+add("Bovenregel", g, "R44", PART_X0, PART_X1, F1, IN_Y1, Z1 - S, Z1)
 for y in (F1, mid(F1, CAT_Y0 - S), CAT_Y0 - S, CAT_Y1):
     add("Stijl", g, "R44", PART_X0, PART_X1, y, y + S, Z0 + S, Z1 - S)
 add("Latei kattenopening", g, "R44", PART_X0, PART_X1, CAT_Y0, CAT_Y1, Z0 + CAT_H, Z0 + CAT_H + S)
@@ -213,7 +212,7 @@ for lbl, xa in (("trapzijde", ROOM_X1), ("verandazijde", PART_X1)):
     add(f"Plaat {lbl}", g, "LP9", xa, xa + PLY, CAT_Y0, CAT_Y1, Z0 + CAT_H, Z1, count=False)
 
 g = "F Rechterwand beneden"
-wall_y(g, XR0, XR1, F0, YB0, Z0, (F0,) + SIDE_Y)
+wall_y(g, XR0, XR1, F0, IN_Y1, Z0, (F0,) + SIDE_Y)
 for a, b in zip(SIDE_Y, SIDE_Y[1:]):
     add_pir("PIR wand", g, XR0, XR1, a + S, b, Z0 + S, Z1 - S)
 add("Binnenplaat", g, "LP9", IN_X1, XR0, F0, IN_Y1, Z0, Z1, note="dicht tot aan de voorzijde")
@@ -257,11 +256,11 @@ g = "I Achterwand boven"
 wall_x(g, YB0, YB1, Z0, BACK_U)
 for a, b in zip(BACK_U, BACK_U[1:]):
     add_pir("PIR wand", g, a + S, b, YB0, YB1, Z0 + S, Z1 - S)
-add("Binnenplaat", g, "LP9", IN_X0, IN_X1, IN_Y1, YB0, Z0, Z1, note="gat d102 voor ventilatiebuis, op buismaat aanpassen")
+add("Binnenplaat", g, "LP9", F0, XR1, IN_Y1, YB0, Z0, Z1, note="volle breedte: houvast in de hoeken; gat d102 voor ventilatiebuis, op buismaat aanpassen")
 
 for g, xa, xb, plya, plyb in (("J Linkerwand boven", F0, XL1, XL1, IN_X0),
                               ("K Rechterwand boven", XR0, XR1, IN_X1, XR0)):
-    wall_y(g, xa, xb, F1, YB0, Z0, SIDE_Y)
+    wall_y(g, xa, xb, F1, IN_Y1, Z0, SIDE_Y)
     add_pir("PIR wand", g, xa, xb, SIDE_Y[0] + S, SIDE_Y[1], Z0 + S, Z1 - S)
     add_pir("PIR wand", g, xa, xb, SIDE_Y[1] + S, SIDE_Y[2], Z0 + S, Z1 - S)
     add("Binnenplaat", g, "LP9", plya, plyb, IN_Y0, IN_Y1, Z0, Z1)
