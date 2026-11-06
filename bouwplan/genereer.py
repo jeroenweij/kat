@@ -48,7 +48,7 @@ FILL = {
     m.MAT["LAT"]: C("#d8c7a6"), m.MAT["DG"]: C("#c08a4e"), m.MAT["DM"]: C("#c08a4e"), m.MAT["DK"]: C("#3a3f43"),
 }
 LEGEND = [("R44", "regel 44x44"), ("B69", "balk 44x69"), ("I69", "geïmpr. balk"), ("LP9", "Elliotis Pine 9"), ("BP12", "betonplex 12"),
-          ("OSB", "OSB-3 11"), ("PIR", "PIR 70"), ("LAT", "spouwlat"), ("DG", "gevel grenen beits"), ("DK", "hoek/boei antraciet")]
+          ("OSB", "OSB-3 11"), ("PIR", "PIR 70"), ("LAT", "spouwlat"), ("DG", "gevel grenen beits"), ("DK", "hoek/boei/luifel antraciet")]
 
 
 def nl(v, d=1):
@@ -189,6 +189,8 @@ def geometry(p, axis):
     if axis == "yz":
         if kind == "raft":
             return [(y0, z0), (y1, z0), (y1, m.roof_z(y1)), (y0, m.roof_z(y0))]
+        if kind == "canopy":
+            return [(y0, z0), (y1, z0 + m.CANOPY_DROP), (y1, z1), (y0, z1 - m.CANOPY_DROP)]
         if kind == "deck":
             return [(y0, m.roof_z(y0)), (y1, m.roof_z(y1)), (y1, m.roof_z(y1) + m.OSB_T), (y0, m.roof_z(y0) + m.OSB_T)]
         if p.extra.get("stringer"):
@@ -418,6 +420,8 @@ def iso_boxes(mirror=False, dz=None, skip=()):
             b = b[:5] + (b[4] + 42,)
         if p.extra.get("slope") == "deck":
             b = b[:4] + (m.Z_RAFT + 42, m.Z_RAFT + 60)
+        if p.extra.get("slope") == "canopy":
+            b = b[:4] + (b[4] + m.CANOPY_DROP / 2, b[5] - m.CANOPY_DROP / 2)
         if p.extra.get("trim"):
             b = b[:5] + (m.Z_RAFT + 60,)
         if p.extra.get("stringer"):
@@ -726,10 +730,11 @@ def details_page(sh):
     rect(v, 18, 40, jt + 46, jt + 90, lat)
     rect(v, 0, 71, -90, 0, colors.white, lw=0.5)
     rect(v, -19, 0, -90, -6, colors.white, lw=0.3)
-    rect(v, -90, 0, jt + 12, jt + 30, wood)    # luifel
-    poly(v, [(-96, jt + 9), (2, jt + 32), (2, jt + 35), (-96, jt + 12)], alu, lw=0.3)
+    d = m.CANOPY_DROP
+    poly(v, [(-90, jt + 12 - d), (0, jt + 12), (0, jt + 30), (-90, jt + 30 - d)], dark)   # luifel
+    poly(v, [(-96, jt + 30 - d * 96 / 90), (0, jt + 30), (0, jt + 32), (-96, jt + 32 - d * 96 / 90)], tray, lw=0.2)   # EPDM
     rect(v, 0, 71, 0, jt, foam, lw=0.2)
-    leader(v, -45, 36, 214, 174, "Regenluifel 18x100, alu kap met druipneus (alleen beneden)")
+    leader(v, -45, 27, 214, 174, "Regenluifel 18x90 antraciet, loopt 12 af; EPDM met druiprand")
     leader(v, 8, 30, 214, 168, "Band tussenvloer; spouwlat bovenin steunt het raam erboven")
     leader(v, 35, 2, 214, 162, f"Kop {m.WIN_JOINT} mm: afkitten, folie omzetten; plafond rust niet op kozijn")
     leader(v, 60, -40, 214, 156, "Kozijn: naad en glaslatten aan buitenzijde afkitten")
@@ -880,7 +885,8 @@ def write_drawings(path):
     dim(v, 0, 0, m.W, 0, -34, str(m.W))
     dim(v, -100, 0, -100, top, 8, str(top))
     legend(c, 18, 28)
-    label(c, 110, 28, "Hoeklatten en boeiboorden in antraciet beits, de rest van de gevel met kader en band in grenen beits (kleur op tekening is indicatief); bij beide blijft de houtnerf zichtbaar. Plankmaten: zie zaaglijst. Boven de lage ramen zit de regenluifel.", 7)
+    label(c, 110, 30, "Hoeklatten, boeiboorden en regenluifel in antraciet beits, de rest van de gevel met kader en band in grenen beits.", 7)
+    label(c, 110, 26, "Tekenkleur indicatief; nerf blijft zichtbaar. Plankmaten: zie zaaglijst. Luifel tussen de hoeklatten.", 7)
 
     # T3 aanzichten zijkanten
     sh.new("Aanzichten zijkanten", "1:10")
@@ -1108,7 +1114,7 @@ def purchase():
         ("Kiepbeveiliging voor katten, of kiepstand blokkeren", 2, "st", None, C_, "Zie veiligheid"),
         ("GAH.ALBERTS Lekdorpelprofiel 34x17 alu blank 200 cm (art. 10295993)", 1, "st", 8.75, H, "Gecontroleerd; 1070 + 600 uit 1 stuk. Vorm in de winkel controleren"),
         ("Kit voor buitenaansluitingen en glaslatten, buitenkwaliteit", 1, "set", None, C_, "Geschikt voor kunststof"),
-        ("Alu kap en 3 RVS consoles voor regenluifel", 1, "set", None, C_, ""),
+        ("5 RVS consoles voor regenluifel", 5, "st", None, C_, "Luifel over de hele breedte; bovenkant met EPDM-rest en druiprand"),
         ("Fundering", None, None, None, None, None),
         ("Beton 25 kg (6 poeren 300x300x500 = 270 liter)", 24, "zak", None, C_, "Hoeveelheid van verpakking afhankelijk; meer op klei"),
         ("KAISERTHAL U-paalhouder met betonanker 71x100x200, thermisch verzinkt (art. 3896646)", 6, "st", 2.95, "Hornbach, 6-11-2026", "In verse poer zetten. Treksterkte en inbouwdiepte niet opgegeven"),
@@ -1164,7 +1170,7 @@ def write_text(path_a, path_b):
              ["Ventilatie", "PVC Ø100 met afsluitbaar rooster, aanvoer via trapgat. Ø40 is te weinig (zie berekening)."],
              ["Plaatsing", "Op het terras in Rijswijk, in de hoek bij de schutting. Rug naar de schutting, ramen naar het terras. Achterwand minstens 250 mm van de schutting."],
              ["Fundering", "6 betonpoeren onder de terrastegels, met U-paalhouders in het beton; trekvast. Vloer beneden met PIR 70 en een OSB-onderplaat. Vrije hoogte onder het frame ca. 170 mm."],
-             ["Materiaal", "Vooral Hornbach. Gevel Douglas 18 x 145 met Hornbach Hybride houtbeits grenen, hoeklatten en boeiboorden in Hybride houtbeits RAL 7016 antraciet; dak EPDM."],
+             ["Materiaal", "Vooral Hornbach. Gevel Douglas 18 x 145 met Hornbach Hybride houtbeits grenen, hoeklatten, boeiboorden en regenluifel in Hybride houtbeits RAL 7016 antraciet; dak EPDM."],
              ], [33, 145])]
     A += [P("Jouw keuzes", "h2")]
     for t in (
@@ -1355,7 +1361,7 @@ def write_text(path_a, path_b):
         ("Plafond en dak", ["Maak de plafondcassette L en schroef die op de wanden. PIR bovenop de plaat.", "Zaag de 5 sporen schuin en schroef ze op de balken. Schroef de OSB-plaat met RVS 4 x 40 op de sporen, met de lange kant dwars erop; rond de hoeken af. Houd de plaat droog tot de EPDM erop zit.", "Lijm de EPDM met Premiumfol Bonding Adhesive volgens de handleiding, bij droog weer boven 5 °C. Dit is contactlijm: smeer plaat en EPDM allebei in, laat afdampen en leg het in één keer goed; op zuigende OSB eerst testen of primer nodig is. Werk de naden af met Adhesive & Sealant. Bevestig boeiboorden, gootje en afvoer.", "Bevestig de daktrim: 11 mm OSB geeft schroeven te weinig houvast, en de wind trekt aan de dakrand. Laat elke schroef doorlopen in het boeiboord. Lukt dat niet, schroef dan een stuk spouwlat onder de dakrand en schroef daarin.", "<b>Het casco is nu regendicht.</b> Laat het droog nakijken voordat je verdergaat."]),
         ("Folie en spouw", ["Breng de folie aan op alle gevels rond het casco, met minstens 100 mm overlap en boven over onder. Neem de folie mee in de sparingen.", "Spouwlatten volgens bladen T2 en T3, met RVS 4 x 40 om de 300 mm. Op de achterwand beneden staan de latten niet recht voor de stijlen: schroef daar alleen waar een regel of stijl achter de lat zit, niet in de PIR. Laat onder en boven open en dek af met stroken RVS-gaas van ca. 40 mm breed, in een L gevouwen. Draag handschoenen; geen uitstekende draadjes."]),
         ("Ramen", ["Zaag het lekdorpelprofiel op 1070 en 600 mm en maak de randen glad. Zet de staande zijde tegen de voorkant van de band, met de bovenkant gelijk met de vloer en de schuine zijde naar buiten. Niet hoger, anders staat het kozijn scheef. Voorboor en schroef met RVS 3,5 x 25 om de 200 mm en kit de gaten. Kit ook de open kopjes dicht.", "Lijm de EPDM op de vloerplaat, over de bovenrand van de band en langs de staande zijde omlaag, tot minstens 10 mm op de schuine zijde. Laat achter een rand van 30 mm vrij, die straks achter het kozijn omhoog komt. Geen stelblokjes en geen dorpellat: het kozijn staat direct op de EPDM.", "Plaats het raam binnenstebuiten, kozijn gelijk met de gevel, waterpas en haaks, met de zijkanten gelijk met de binnenplaten. Zet het tijdelijk vast met wiggen. Vul bij elk bevestigingspunt drukvast op: wig 6 mm plus 3 mm in de zijvoeg van 9 mm, wig 6 mm in de kopvoeg van 5 mm. Meet of het kozijn recht blijft.", f"Bevestig met kozijnschroeven 7,5 x 112, Torx T30, voorgeboord, op ongeveer 55 mm van de gevel: maximaal 150 mm uit de binnenhoeken en maximaal 600 mm onderling, bij voorkeur bij de sluitpunten. Bovenraam: 2 per zijkant en 3 boven. Onderraam: 2 per zijkant en 2 boven. Niet door de onderkant: dat doorboort de EPDM. Controleer de bediening en stel het beslag zo nodig af. Verlijm de EPDM-rand tegen de achterkant van het kozijn.", "Compriband aan de buitenkant van de zijvoegen, kit in de kopvoeg, op glaslatten en naden. Vul de rest van de voeg volledig met weinig PU-vulschuim of minerale wol en laat het raam vast staan tot het schuim hard is; niet dichtkitten wat water moet afvoeren. Controleer of de vleugel vrij langs de dorpel draait. Controleer bediening en blokkeer of beveilig de kiepstand."]),
-        ("Gevel", [f"Monteer van onder naar boven, tong omhoog. De bovenste rij is een gerifte strook van {m.TOP_STRIP} mm. Hoeklatten en kader volgens blad T2. Plaats de regenluifel boven het lage raam.", "Bevestig met RVS 4 x 40 op de spouwlatten; voorboren aan de plankeinden. Controleer of de vleugels vrij blijven draaien."]),
+        ("Gevel", [f"Monteer van onder naar boven, tong omhoog. De bovenste rij is een gerifte strook van {m.TOP_STRIP} mm. Hoeklatten en kader volgens blad T2. Plaats de regenluifel tussen de hoeklatten op 5 RVS consoles, op ca. 30 cm afstand, 12 mm aflopend naar voren en met de achterkant tegen de band; kit die naad. Lijm een EPDM-rest over de bovenkant, met een druiprand aan de voorkant. Laat de lekdorpel van het bovenraam erboven vrij drupen.", "Bevestig met RVS 4 x 40 op de spouwlatten; voorboren aan de plankeinden. Controleer of de vleugels vrij blijven draaien."]),
         ("Ventilatie en elektra", [f"Boor Ø102 (op de buismaat) op x = {m.VENT['x']}, z = {m.VENT['z']}. Plaats de PVC-buis met licht afschot naar buiten en het buitenrooster met een rondje RVS-gaas erachter. Rooster binnen.", "Installateur: voeding, kast, thermostaat, voeler, verwarming, aardlektest.", "Bescherm de kabels volledig, plaats de kap en controleer de temperatuur van de kap na 2 uur vol vermogen."]),
         ("Watertest", ["Spoel beide ramen 15 minuten met een tuinslang, van boven naar beneden, met de ramen dicht.", "Kijk daarna aan de binnenzijde van het kozijn en in de goot. Lekt het, dan eerst dat oplossen."]),
         ("Inwerken", ["Bekleed de treden, plaats mat, mand, hygrometer. Maak alle schroefpunten aan de kat-zijde onschadelijk.", "Test 3 dagen zonder kat: temperatuur, vocht, condens, kap en roosterstand.", "Laat de kat wennen met de voeding op de veranda. Controleer de eerste weken de hygrometer, de goot en de wanden."]),
@@ -1371,7 +1377,7 @@ def write_text(path_a, path_b):
         Bd.append(B(t))
     Bd += [P("Bronnen", "h2")]
     for t in (
-        "Hornbach-pagina's bekeken op 6-11-2026: kelderraam 12074105, ARON Basic+ 12331530, betonplex 12628592, Elliotis Pine 10000081, TENCO Bootlak 10728553 (met productinformatieblad), Premiumfol Bonding Adhesive 12218370, betonmortel 7195709, PIR 10368509, EPDM 10469549, daktrim 5581276, Douglas 10537457, vuren 5185884 en 5185888, antraciet beits 10277101, folie 7049802. U-paalhouder 3896646 met gegevensblad (as.80179845).",
+        "Hornbach-pagina's bekeken op 6-11-2026: kelderraam 12074105, ARON Basic+ 12331530, betonplex 12628592, Elliotis Pine 10000081, TENCO Bootlak 10728553 (met productinformatieblad), Premiumfol Bonding Adhesive 12218370, betonmortel 7195709, PIR 10368509, EPDM 10469549, daktrim 5581276, Douglas 10537457, vuren 5185884 en 5185888, antraciet beits 10277060, folie 7049802. U-paalhouder 3896646 met gegevensblad (as.80179845).",
         "KNMI: Windstotenklimatologie van Nederland (TR-306, 2009), figuren 5 en 7.",
         "ARON Basic+ 70 mm technisch blad en montageaanbeveling RC 1/RC 2 (Hornbach, as.187466783, as.187466663), door mij toegepast op een houten wand en op het kelderraam; maattekening kelderraam (as.91729658).",
         "IKO enertherm: Hornbach-productinformatie. Premiumfol: verwerkingsvoorschrift en handleiding via Hornbach.",
@@ -1494,7 +1500,7 @@ def fill_list_tabs(wb):
     for key in STOCK:
         for i, bar in enumerate(NEST[key], 1):
             ws.append([m.MAT[key], i, bar["stock"], " + ".join(str(int(c_[0])) for c_ in bar["cuts"]), int(bar["left"])])
-    for key, label_ in (("DG", m.MAT["DG"]), ("DK", "Douglas 18x145 (hoek/boei antraciet + kader grenen beits)")):
+    for key, label_ in (("DG", m.MAT["DG"]), ("DK", "Douglas 18x145 (hoek/boei/luifel antraciet + kader grenen beits)")):
         for i, s in enumerate(NEST[key], 1):
             ws.append([label_, i, 3000, " + ".join(f"{int(it[2])}x{int(it[3])}" for it in s.items), ""])
     finish(ws)

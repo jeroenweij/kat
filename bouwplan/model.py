@@ -373,8 +373,10 @@ add("Kaderstijl beneden links", g, "DM", 58, IN_X0, 0, CLAD, Z_DECK, Z_L_TOP)
 add("Kaderstijl beneden rechts", g, "DM", ROOM_X1, VER_X0, 0, CLAD, Z_DECK, Z_L_TOP)
 add("Voorrand vloer", g, "DM", 58, W - 58, 0, CLAD, ZC0, Z_DECK)
 add("Afdekking wandkop veranda", g, "DM", IN_X1, W - 58, 0, CLAD, Z_DECK, Z_L_TOP, note="dekt de open wandkop af")
-add("Regenluifel raam beneden", g, "DM", IN_X0 - 30, ROOM_X1 + 30, -90, 0, Z_L_TOP + 12, Z_L_TOP + 30,
-    note="op 3 RVS consoles, alu kap, afschot naar voren")
+CANOPY_DROP = 12              # luifel loopt over 90 mm dit stuk af naar voren
+add("Regenluifel", g, "DK", 58, W - 58, -90, 0, Z_L_TOP + 12 - CANOPY_DROP, Z_L_TOP + 30,
+    cut=(W - 116, 91, 18), note="tussen de hoeklatten, 12 mm aflopend naar voren; op 5 RVS consoles, EPDM met druiprand",
+    extra={"slope": "canopy"})
 
 # Niet-houten onderdelen die wel in de tekeningen moeten staan.
 # Ramen binnenstebuiten: de kozijnkant die normaal binnen zit, is gelijk met de gevel.
