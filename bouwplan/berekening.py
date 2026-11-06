@@ -4,7 +4,7 @@ import model as m
 
 T_IN = 11.0                   # midden van de doeltemperatuur 10-12 C
 T_DESIGN = -5.0               # ontwerpnacht
-PIR_R = 1.80                  # Rd IKO enertherm 40 mm, Hornbach
+PIR_R = 3.15                  # Rd IKO enertherm 70 mm, Hornbach
 PLY_L, WOOD_L = 0.17, 0.13    # W/mK
 UW_UP = 1.3                   # Hornbach kelderraam
 RSI, RSE, RSI_DOWN = 0.13, 0.13, 0.17
@@ -16,7 +16,10 @@ def magnus(t):
     return p / (461.5 * (t + 273.15)) * 1000
 
 
-def stack_flow(diam_mm, t_out, h=0.85, cd=0.5):
+STACK_H = (m.VENT["z"] - (m.Z_DECK + m.ROOM_H / 2)) / 1000   # afvoer boven het midden van de veranda
+
+
+def stack_flow(diam_mm, t_out, h=STACK_H, cd=0.5):
     """Natuurlijke trek in m3/h, zonder wind. cd 0,5 houdt rekening met gaas en bochten."""
     dt = T_IN - t_out
     if dt <= 0:
@@ -35,27 +38,29 @@ def needed_flow(t_out, rh_out=0.9, moist=10.0, rh_in=0.75):
 def heat():
     r_ply = m.PLY / 1000 / PLY_L
     r_ply18 = m.PLY_F / 1000 / PLY_L
-    r_w44 = 0.044 / WOOD_L
+    r_w_wall = m.J / 1000 / WOOD_L
     r_w69 = 0.069 / WOOD_L
     u_wall_ins = 1 / (RSI + r_ply + PIR_R + RSE)
-    u_wall_wood = 1 / (RSI + r_ply + r_w44 + RSE)
-    u_floor_ins = 1 / (RSI_DOWN + r_ply18 + PIR_R + 0.18 + r_ply + RSE)
+    u_wall_wood = 1 / (RSI + r_ply + r_w_wall + RSE)
+    u_floor_ins = 1 / (RSI_DOWN + r_ply18 + PIR_R + r_ply + RSE)   # PIR vult de hele holte
     u_floor_wood = 1 / (RSI_DOWN + r_ply18 + r_w69 + r_ply + RSE)
     u_ceil_ins = 1 / (RSI + r_ply + PIR_R + RSE)
     u_ceil_wood = 1 / (RSI + r_ply + r_w69 + RSE)
 
     iw, id_, ih = (m.IN_X1 - m.IN_X0) / 1000, (m.IN_Y1 - m.IN_Y0) / 1000, m.ROOM_H / 1000
-    stud = m.STUD_H / 1000
+    def pir_area(group, name, ax):
+        return sum((p.box[ax[0] + 1] - p.box[ax[0]]) * (p.box[ax[1] + 1] - p.box[ax[1]])
+                   for p in m.parts if p.group[0] in group and p.name == name) / 1e6
     a_side = id_ * ih
-    a_side_pir = 2 * 0.300 * stud
+    a_side_pir = pir_area("J", "PIR wand", (2, 4))
     a_back = iw * ih
-    a_back_pir = 4 * 0.250 * stud
-    a_front = iw * ih - 0.5
+    a_back_pir = pir_area("I", "PIR wand", (0, 4))
+    a_front = iw * ih - m.WIN_U_W * m.WIN_H / 1e6
     hole = (m.HOLE_X1 - m.HOLE_X0) * (m.HOLE_Y1 - m.HOLE_Y0) / 1e6
     a_floor = iw * id_ - hole
     a_floor_pir = sum((p.box[1] - p.box[0]) * (p.box[3] - p.box[2]) for p in m.parts if p.name == "PIR tussenvloer") / 1e6
     a_ceil = iw * id_
-    a_ceil_pir = 4 * 0.250 * 0.732
+    a_ceil_pir = pir_area("L", "PIR plafond", (0, 2))
 
     def h(a_tot, a_ins, ui, uw):
         return min(a_ins, a_tot) * ui + max(a_tot - a_ins, 0) * uw
@@ -63,7 +68,7 @@ def heat():
     parts = {
         "Zijwanden (2x)": h(2 * a_side, 2 * a_side_pir, u_wall_ins, u_wall_wood),
         "Achterwand": h(a_back, a_back_pir, u_wall_ins, u_wall_wood),
-        "Voorwand rond raam (vooral hout)": a_front * u_wall_wood,
+        "Voeg rond het raam (hout)": a_front * u_wall_wood,
         "Raam 100x50 (Uw 1,3)": 0.5 * UW_UP,
         "Vloer": h(a_floor, a_floor_pir, u_floor_ins, u_floor_wood),
         "Plafond": h(a_ceil, a_ceil_pir, u_ceil_ins, u_ceil_wood),
@@ -100,18 +105,26 @@ def results():
     vent_rows = []
     for t in (-5, 0, 5, 10):
         vent_rows.append((t, needed_flow(t, moist=5), needed_flow(t, moist=10),
-                          stack_flow(36, t), stack_flow(46, t), stack_flow(71, t)))
+                          stack_flow(36, t), stack_flow(71, t), stack_flow(96, t)))
 
     # stabiliteit
     mass = m.weight()
-    q_wind = 0.9       # kN/m2: stootdruk x vormfactor (aanname, ruim voor beschutte tuin)
+    q_wind = 0.9       # kN/m2: stootdruk x vormfactor (aanname)
+    v_ref = 130        # km/h: stoot op chalethoogte die ongeveer bij q_wind hoort (aanname, vormfactor 1,1)
     height = m.Z_TOP / 1000
-    a_wind = 1.5 * height
+    a_wind = m.ROOF_W / 1000 * height
     F = q_wind * a_wind
     M_over = F * (height / 2 + 0.18)
-    M_stab = mass * 9.81 / 1000 * 0.41
-    tension = max(M_over - M_stab, 0) / 0.75
+    # kantelen om de lijwaartse poten: alleen de diepte van het vloerframe telt
+    leg_span = (m.LEG_Y[1][0] - m.LEG_Y[0][0]) / 1000
+    M_stab = mass * 9.81 / 1000 * (m.YB1 - m.F0) / 2000
+    tension = max(M_over - M_stab, 0) / leg_span
     poer_kg = 0.3 * 0.3 * 0.5 * 2300
+    leg_kg = tension / 3 * 1000 / 9.81           # trek per poot in de rij aan de loefzijde
+    # alleen betongewicht, 3 poeren dragen gelijk; tegel en grondwrijving tellen niet mee
+    M_anchor = 3 * poer_kg * 9.81 / 1000 * leg_span + M_stab
+    v_anchor = v_ref * math.sqrt(M_anchor / M_over)
+    v_free = v_ref * math.sqrt(M_stab / M_over)  # kantelen zonder verankering
 
     # inwendige condensatie-grove controle op oppervlaktetemperatuur
     def surf(u):
@@ -129,7 +142,7 @@ def results():
                 p_vent=p_vent, peak=p_trans + p_vent, p_avg=p_avg, kwh=kwh_season, p_dec=p_dec,
                 wh_day_dec=wh_day_dec, wp_needed=wp_needed, batt_wh=battery_12v_100ah, batt_hours=batt_hours,
                 pv100=pv100, vent=vent_rows, mass=mass, F=F, M_over=M_over, M_stab=M_stab, tension=tension,
-                poer_kg=poer_kg, dew=dew, s_ins=surf(hh["U"]["wall_ins"]), s_wood=surf(hh["U"]["wall_wood"]),
+                poer_kg=poer_kg, leg_kg=leg_kg, v_ref=v_ref, v_anchor=v_anchor, v_free=v_free, dew=dew, s_ins=surf(hh["U"]["wall_ins"]), s_wood=surf(hh["U"]["wall_wood"]),
                 s_glass=surf(1.1))
 
 
