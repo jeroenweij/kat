@@ -14,6 +14,8 @@ A building design project, not a software product: a modern wooden outdoor chale
 - `bouwplan/Kattenchalet_zaag_en_inkooplijst.xlsx`: lists, generated once and since edited by the user. Do not regenerate it without asking.
 - `bouwplan/model.py`, `berekening.py`, `genereer.py`: the sources.
 - `bouwplan/Betonplex_zaagplan_trap.dxf`: the user's own drawing, a puzzle to cut the betonplex more efficiently, with the stairs drawn out piece by piece. Hand-made: the scripts do not read or update it.
+- `matverwarming/`: 12 V heated cat mat: 5 JLCPCB flex heater segments forming a ring. The segment shape comes from the user's `Ontwerp.dxf`; `heater.py` reads it, writes the Gerbers and checks clearances; `LEESMIJ.md` has the order settings and the remark.
+- `controller/`: ESP32 controller for the mat (5 segments each with NTC and MOSFET, 12 V room heater, fan, INA226, SHT40, DS18B20). `maak_schema.py` generates the KiCad 9 schematic (edit the script, not the schematic); `esphome/` holds the ESPHome config. `LEESMIJ.md` lists the pin map and safety logic.
 - `kozijn/`: Hornbach and ARON window documents, git-ignored. Only `as.187466663.pdf` covers mounting.
 
 ## Commands
@@ -62,13 +64,13 @@ User decisions:
 - The top row of cladding is a ripped strip of 65 mm, above 9 full boards.
 - The strip sawing layout assumes the full 145 mm plank width. After removing tongue and groove, 130 mm or less needs 6 planks instead of 5; the purchase list has 2 spare planks. Measure a plank, then redo the layout if needed.
 - Heating and electrical costs are left out of the purchase list for now; the design still includes them.
+- Power (7-11-2026): no 230 V at the chalet; everything runs on a 12 V battery. This overrides the earlier mains heating and the 120 W tube heater in the plan (detail 8, purchase list, `berekening.py` text), which are not yet updated. Heat: the 5-segment heated mat in `matverwarming/` (about 17 W) plus a 12 V 100 W PTC air heater (FABULETTA, Amazon B0GVNRHWS2, 113 x 35 x 26 mm) behind the steel cage, only when the room is below 8 °C; the mat only when the room is below 15 °C. The ESP32 controller in `controller/` sheds the heater first, then the mat, on low battery voltage. Battery: lead-acid for now (capacity not given), so the controller sheds the heater below 12.2 V and the mat below 12.0 V; LiFePO4 and solar are postponed until after the winter.
 - Location: terrace in Rijswijk ZH, in the corner by a fence 1,8 m high whose posts have no concrete. Back to the fence, windows to the terrace. Loose tiles, falling across the chalet. The rear wall stays at least 250 mm from the fence (Claude's figure: 100 mm roof overhang plus gutter).
 - Footing: 6 concrete footings 300 x 300 x 500 under the tiles, with KAISERTHAL U post holders (art. 3896646) set in the fresh concrete; the anchor rod passes through a Ø25 hole in the tile. Not screwed to the tiles alone, and not fixed to the fence. Fixed height, so the slope is taken up by the rod length and by cutting the posts. To remove: cut the rods and replace the 6 tiles; the concrete stays hidden in the ground.
 
 Recommendations the user has accepted:
 - Alu-faced PIR with no extra vapour foil. The user chose 70 mm (art. 10368509, Rd 3,15, pack of 7 = 5,04 m²) over 40 mm and accepted 5 cm extra width. Side and rear walls are framed in 44 x 69, the partition stays 44 x 44 without PIR. Leftover PIR goes in the outer walls of the stair room and veranda and in the ground floor, for less waste rather than for heat. The ground floor is closed below with 11 mm OSB from the roof sheet offcut, notched around the 6 legs. The 1 mm mesh is not used there: it is too thin against mice. The sheet is 1 mm thicker than the 69 mm framing; the model draws it 69.
 - PVC vent of Ø100 (the user has an offcut) with closable grille inside (art. 4152757) and a grille outside (art. 8610839), instead of Ø40. Insect protection for the vent and cavity: 304 stainless mesh, 20 mesh, about 1 mm opening, 40 x 200 cm (Amazon B0DL5P11F2), because Hornbach only has 6,3 mm. The opening is derived from the listing and must be measured on delivery.
-- Mains heating as the main source instead of solar and battery.
 - Anchored footings with tension-proof post holders.
 
 Still to verify: holder dimensions on delivery (Hornbach gives no tensile strength, embedment or meaning of the sizes; the plan assumes a 100 mm U and a 200 mm rod, with at least 90 mm in the concrete); tile size and pattern; soil under the terrace; window outer sizes and hinge side on delivery; Hornbach availability of impregnated 44 x 69 and the PIR facing; use class of the battens (art. 2094248, 21 x 45 x 2500, 1 mm off the drawn 22 x 44, which the model keeps); a specific heater model.

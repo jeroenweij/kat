@@ -842,6 +842,87 @@ def nest_page(sh):
     c.drawString(16 * mm, 16 * mm, "Zaagsnede 4 mm meegerekend. Letter = bouwdeel (zie zaaglijst). Positie van elk stuk: Excel, tabblad Platen op maat. Hornbach kan platen in de vestiging op maat voorzagen; laat grote stroken voorsnijden voor transport.")
 
 
+def bars_page(sh):
+    """Zaagplan voor alle balken, regels, palen en latten: per handelslengte de stukken op schaal."""
+    sh.new("Zaagplan balken en latten", "1:20")
+    c = sh.c
+    sc, bh, pitch = 20, 6.5, 10.2
+
+    def fit(text, font, size, width):   # width in mm
+        width *= mm
+        if pdfmetrics.stringWidth(text, font, size) <= width:
+            return text
+        while text and pdfmetrics.stringWidth(text + ".", font, size) > width:
+            text = text[:-1]
+        return text + "." if len(text) >= 3 else ""
+
+    def block(key, x, y):
+        bars_ = NEST[key]
+        mix = " + ".join(f"{sum(b_['stock'] == s for b_ in bars_)} x {s}" for s in sorted(STOCK[key], reverse=True)
+                         if any(b_["stock"] == s for b_ in bars_))
+        label(c, x, y, f"{m.MAT[key]}: {len(bars_)} {'stuk' if len(bars_) == 1 else 'stuks'} ({mix})", 7.5, True, ACC)
+        y -= 4
+        bx = x + 21
+        for i, bar in enumerate(bars_, 1):
+            y -= pitch
+            c.setStrokeColor(INK)
+            c.setLineWidth(0.3)
+            c.rect(x * mm, (y + 1.6) * mm, 3 * mm, 3 * mm)          # afvinkhokje
+            label(c, x + 4.5, y + 2.2, f"{i}", 7, True)
+            label(c, x + 10, y + 2.2, f"{bar['stock']}", 6.2)
+            v = View(c, bx, y, sc)
+            rect(v, 0, bar["stock"], 0, bh * sc, C("#f4f1ea"), lw=0.4)
+            u = 0
+            for l, nm in bar["cuts"]:
+                rect(v, u, u + l, 0, bh * sc, FILL[m.MAT[key]], lw=0.3)
+                w = l / sc - 0.8
+                cx_ = (bx + (u + l / 2) / sc) * mm
+                g, name = nm.split(":", 1)
+                c.setFillColor(INK)
+                t = fit(str(int(l)), "DB", 5.6, w)
+                if t:
+                    c.setFont("DB", 5.6)
+                    c.drawCentredString(cx_, (y + 3.6) * mm, t)
+                    c.setFont("D", 4.3)
+                    c.drawCentredString(cx_, (y + 1.0) * mm, fit(f"{g} {name}", "D", 4.3, w))
+                else:   # te kort voor tekst in de balk: maat erboven
+                    c.setFont("DB", 4.6)
+                    c.drawCentredString(cx_, (y + bh + 0.8) * mm, f"{g} {int(l)}")
+                u += l + 4
+            rest = bar["stock"] - u
+            if rest > 0:
+                c.setFillColor(C("#7a7a7a"))
+                c.setFont("D", 4.6)
+                t = next((t for t in (f"rest {int(rest)}", str(int(rest)))
+                          if pdfmetrics.stringWidth(t, "D", 4.6) <= (rest / sc - 0.6) * mm), "")
+                if t:
+                    c.drawCentredString((bx + (u + rest / 2) / sc) * mm, (y + 2.4) * mm, t)
+        return y - 7
+
+    y = block("B69", 16, 272)
+    y = block("I69", 16, y)
+    y = block("R44", 16, y)
+    block("P69", 16, y)
+    y = block("LAT", 222, 272)
+
+    notes = [
+        "Zo lezen: elke balk is één handelslengte, links begonnen. Zaag de stukken in deze volgorde af; na elke snede gaat 4 mm verloren.",
+        "Hornbach mag tot 1 cm korter leveren: meet de lat eerst en houd die marge aan het eind (de rest) over.",
+        "Letter = bouwdeel, zoals in de zaaglijst en op de wandframes T8 en T9. Vink het hokje af als de balk gezaagd is.",
+        "Schrijf bouwdeel en naam met potlood op elk stuk. Gelijke stukken (stijlen 417, balken 596) mogen onderling wisselen.",
+        "Sporen M: eerst op lengte 1039 zagen, daarna de schuine snede volgens T7.",
+        f"Poten A: hier nominaal {m.Z_LEG-m.Z_POST} mm; zaag elke poot pas op maat bij het stellen, zodat de vloer waterpas komt.",
+        "Spouwlatten: hier als hele stukken getekend. Met een las op een stijl volstaan 10 latten (inkooplijst);",
+        "zaag dan de korte stukken uit de resten van de latten links, rechts en achter.",
+        "Gevelplanken, hoeklatten, boeiboorden en kader uit Douglas 18 x 145: Excel, tabblad Latten op lengte.",
+    ]
+    ny = y - 4
+    label(c, 222, ny, "Toelichting", 7.5, True, ACC)
+    for t in notes:
+        ny -= 4.6
+        label(c, 222, ny, t, 6.3)
+
+
 def write_drawings(path):
     c = canvas.Canvas(path, pagesize=landscape(A3))
     c.setTitle("Kattenchalet tekeningen")
@@ -1013,6 +1094,7 @@ def write_drawings(path):
 
     details_page(sh)
     nest_page(sh)
+    bars_page(sh)
 
     # montage explosie
     sh.new("Montagevolgorde (explosietekening)", "n.v.t.")
