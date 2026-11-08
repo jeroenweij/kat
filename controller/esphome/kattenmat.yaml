@@ -1,0 +1,380 @@
+# Kattenchalet: controller voor de verwarmde mat (5 segmenten), PTC-verwarmer en ventilator.
+# Voeding: 12 V-accu (geen netstroom). Bij lage accuspanning valt eerst de verwarmer af, dan de mat.
+# Hoort bij controller/kattenmat.kicad_sch. Webinterface op http://kattenmat.local (wachtwoord in secrets.yaml).
+#
+# Veiligheid: de ESP regelt zelfstandig; wifi is alleen om mee te kijken en in te stellen.
+# De bimetaalschakelaar van 45 °C in de mat staat los van deze software en blijft verplicht.
+
+substitutions:
+  i_min: "0.15"          # A: minimale stroomstap van één segment (nominaal 0,28 A)
+  i_max: "0.45"          # A: maximale stroomstap
+  t_seg_max: "42.0"      # °C: segment uit en vergrendeld
+  t_mat_max: "45.0"      # °C: hele mat uit en vergrendeld
+  t_afwijking: "6.0"     # °C: segment wijkt af van de mediaan van de andere
+
+esphome:
+  name: kattenmat
+  friendly_name: Kattenmat
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+logger:
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  output_power: 20dB
+  ap:
+    ssid: "Kattenmat-setup"
+    password: !secret ap_password
+
+captive_portal:
+
+api:
+  encryption:
+    key: !secret api_key
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+web_server:
+  port: 80
+  version: 3
+  auth:
+    username: !secret web_user
+    password: !secret web_password
+
+status_led:
+  pin: GPIO19
+
+packages:
+  seg1: !include { file: segment.yaml, vars: { n: "1", adc_pin: GPIO36, out_pin: GPIO25, period: 17s } }
+  seg2: !include { file: segment.yaml, vars: { n: "2", adc_pin: GPIO39, out_pin: GPIO26, period: 19s } }
+  seg3: !include { file: segment.yaml, vars: { n: "3", adc_pin: GPIO34, out_pin: GPIO27, period: 23s } }
+  seg4: !include { file: segment.yaml, vars: { n: "4", adc_pin: GPIO35, out_pin: GPIO13, period: 29s } }
+  seg5: !include { file: segment.yaml, vars: { n: "5", adc_pin: GPIO32, out_pin: GPIO4, period: 31s } }
+
+globals:
+  - id: mat_ok                 # false na een ernstige fout (doorgeslagen MOSFET, te heet); vergrendeld
+    type: bool
+    restore_value: true
+    initial_value: "true"
+  - id: mat_actief             # hoofdschakelaar staat werkelijk aan
+    type: bool
+    initial_value: "false"
+  - id: switch_seq
+    type: int
+    initial_value: "0"
+  - id: last_switch_ms
+    type: uint32_t
+    initial_value: "0"
+  - id: kamer_koud
+    type: bool
+    initial_value: "true"
+  - id: bat_ok_mat             # accu vol genoeg voor de mat (hysterese 0,4 V)
+    type: bool
+    initial_value: "true"
+  - id: bat_ok_kachel          # accu vol genoeg voor de verwarmer (hysterese 0,4 V)
+    type: bool
+    initial_value: "true"
+  - id: kachel_on
+    type: bool
+    initial_value: "false"
+  - id: fan_on
+    type: bool
+    initial_value: "false"
+
+i2c:
+  sda: GPIO21
+  scl: GPIO22
+  frequency: 50kHz            # SHT40 zit op een kabel
+
+one_wire:
+  - platform: gpio
+    pin: GPIO16
+
+output:
+  - platform: gpio
+    id: mat_main
+    pin: GPIO17
+  - platform: gpio
+    id: heat_out
+    pin: GPIO23
+  - platform: gpio
+    id: fan_out
+    pin: GPIO18
+
+sensor:
+  - platform: ina226
+    address: 0x40
+    shunt_resistance: 0.02 ohm
+    max_current: 3A
+    adc_averaging: 16
+    update_interval: 250ms
+    current:
+      id: i_mat
+      name: "Mat stroom"
+      accuracy_decimals: 2
+    power:
+      id: p_mat
+      name: "Mat vermogen"
+    bus_voltage:
+      id: v_ina
+      name: "Accuspanning"
+      accuracy_decimals: 2
+      filters:
+        - sliding_window_moving_average:   # 30 s middelen: inschakelpiek PTC niet meetellen
+            window_size: 120
+            send_every: 20
+
+  - platform: total_daily_energy
+    name: "Mat energie vandaag"
+    power_id: p_mat
+    unit_of_measurement: Wh
+    accuracy_decimals: 0
+
+  - platform: adc
+    id: v_12
+    name: "Accuspanning (ADC, reserve)"
+    pin: GPIO33
+    attenuation: 12db
+    update_interval: 10s
+    filters:
+      - multiply: 6.556       # (100k + 18k) / 18k
+    accuracy_decimals: 1
+
+  - platform: sht4x
+    update_interval: 10s
+    temperature:
+      id: t_room
+      name: "Kamer temperatuur"
+    humidity:
+      id: rh_room
+      name: "Kamer luchtvochtigheid"
+
+  - platform: dallas_temp
+    id: t_out
+    name: "Buiten temperatuur"
+    update_interval: 30s
+
+  - platform: wifi_signal
+    name: "Wifi signaal"
+    update_interval: 60s
+
+number:
+  - platform: template
+    id: mat_sp
+    name: "Mat streefwaarde"
+    optimistic: true
+    restore_value: true
+    initial_value: 34
+    min_value: 25
+    max_value: 38
+    step: 0.5
+    unit_of_measurement: "°C"
+    on_value:
+      - climate.control: { id: pid_1, target_temperature: !lambda "return x;" }
+      - climate.control: { id: pid_2, target_temperature: !lambda "return x;" }
+      - climate.control: { id: pid_3, target_temperature: !lambda "return x;" }
+      - climate.control: { id: pid_4, target_temperature: !lambda "return x;" }
+      - climate.control: { id: pid_5, target_temperature: !lambda "return x;" }
+  - platform: template
+    id: kachel_sp
+    name: "Ruimteverwarmer streefwaarde"
+    optimistic: true
+    restore_value: true
+    initial_value: 8
+    min_value: 0
+    max_value: 15
+    step: 0.5
+    unit_of_measurement: "°C"
+  - platform: template
+    id: mat_kamer_max
+    name: "Mat alleen onder kamertemp."
+    optimistic: true
+    restore_value: true
+    initial_value: 15
+    min_value: 5
+    max_value: 25
+    step: 0.5
+    unit_of_measurement: "°C"
+  - platform: template
+    id: rv_aan
+    name: "Ventilator aan boven RV"
+    optimistic: true
+    restore_value: true
+    initial_value: 75
+    min_value: 50
+    max_value: 95
+    step: 1
+    unit_of_measurement: "%"
+
+  - platform: template
+    id: bat_kachel_min
+    name: "Verwarmer uit onder accuspanning"
+    optimistic: true
+    restore_value: true
+    initial_value: 12.2           # loodaccu: ca. 50 % onder belasting; LiFePO4: 12.9
+    min_value: 11.0
+    max_value: 13.5
+    step: 0.05
+    unit_of_measurement: "V"
+  - platform: template
+    id: bat_mat_min
+    name: "Mat uit onder accuspanning"
+    optimistic: true
+    restore_value: true
+    initial_value: 12.0           # loodaccu: niet dieper ontladen; LiFePO4: 12.5
+    min_value: 11.0
+    max_value: 13.5
+    step: 0.05
+    unit_of_measurement: "V"
+
+time:
+  - platform: sntp
+    id: sntp_time
+
+switch:
+  - platform: template
+    id: mat_aan
+    name: "Mat aan"
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+  - platform: template
+    id: kachel_aan
+    name: "Ruimteverwarmer toegestaan"
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+
+binary_sensor:
+  - platform: template
+    name: "Ruimteverwarmer aan"
+    id: kachel_bs
+    lambda: "return id(kachel_on);"
+  - platform: template
+    name: "Ventilator aan"
+    lambda: "return id(fan_on);"
+  - platform: template
+    name: "Mat fout"
+    device_class: problem
+    lambda: |-
+      return !id(mat_ok) || id(seg1_fault) || id(seg2_fault) || id(seg3_fault) || id(seg4_fault) || id(seg5_fault);
+
+text_sensor:
+  - platform: template
+    name: "Status"
+    update_interval: 5s
+    lambda: |-
+      if (!id(mat_ok)) return std::string("MAT UIT: ernstige fout, controleer en wis fouten");
+      std::string s;
+      bool f[5] = {id(seg1_fault), id(seg2_fault), id(seg3_fault), id(seg4_fault), id(seg5_fault)};
+      for (int i = 0; i < 5; i++) if (f[i]) s += "segment " + std::to_string(i + 1) + " uit; ";
+      if (!id(mat_aan).state) s += "mat handmatig uit; ";
+      else if (!id(kamer_koud)) s += "mat in rust (kamer warm genoeg); ";
+      if (!id(bat_ok_mat)) s += "ACCU LEEG: mat en verwarmer uit; ";
+      else if (!id(bat_ok_kachel)) s += "accu laag: verwarmer uit; ";
+      if (std::isnan(id(t_room).state)) s += "kamersensor ontbreekt; ";
+      if (std::isnan(id(t_out).state)) s += "buitensensor ontbreekt; ";
+      return s.empty() ? std::string("OK") : s;
+
+button:
+  - platform: template
+    name: "Fouten wissen"
+    on_press:
+      - lambda: |-
+          id(seg1_fault) = id(seg2_fault) = id(seg3_fault) = id(seg4_fault) = id(seg5_fault) = false;
+          id(mat_ok) = true;
+          ESP_LOGW("mat", "Fouten gewist");
+  - platform: restart
+    name: "Herstart"
+
+interval:
+  # Bewaking van de mat: hoofdschakelaar, temperatuurgrenzen, afwijking tussen segmenten.
+  - interval: 2s
+    then:
+      - lambda: |-
+          bool *fault[5] = {&id(seg1_fault), &id(seg2_fault), &id(seg3_fault), &id(seg4_fault), &id(seg5_fault)};
+          float t[5] = {id(t_1).state, id(t_2).state, id(t_3).state, id(t_4).state, id(t_5).state};
+          static int nan_cnt[5] = {0}, dev_cnt[5] = {0};
+
+          for (int i = 0; i < 5; i++) {
+            // NTC open (koud/NaN) of kortgesloten (heet)
+            if (std::isnan(t[i]) || t[i] < -25.0f || t[i] > 80.0f) {
+              if (++nan_cnt[i] >= 5 && !*fault[i]) { *fault[i] = true; ESP_LOGW("mat", "Segment %d: NTC defect", i + 1); }
+              continue;
+            }
+            nan_cnt[i] = 0;
+            if (t[i] > ${t_mat_max}) { id(mat_ok) = false; ESP_LOGE("mat", "Segment %d: %.1f °C, hele mat uit", i + 1, t[i]); }
+            if (t[i] > ${t_seg_max} && !*fault[i]) { *fault[i] = true; ESP_LOGW("mat", "Segment %d: te heet (%.1f °C)", i + 1, t[i]); }
+          }
+
+          // afwijking ten opzichte van de mediaan van de geldige segmenten
+          float v[5]; int n = 0;
+          for (int i = 0; i < 5; i++) if (!std::isnan(t[i]) && !*fault[i]) v[n++] = t[i];
+          if (n >= 3) {
+            for (int a = 1; a < n; a++) for (int b = a; b > 0 && v[b - 1] > v[b]; b--) std::swap(v[b - 1], v[b]);
+            float med = v[n / 2];
+            for (int i = 0; i < 5; i++) {
+              if (std::isnan(t[i]) || *fault[i]) { dev_cnt[i] = 0; continue; }
+              if (std::fabs(t[i] - med) > ${t_afwijking}) {
+                if (++dev_cnt[i] >= 60) { *fault[i] = true; ESP_LOGW("mat", "Segment %d wijkt af (%.1f vs %.1f °C)", i + 1, t[i], med); }
+              } else dev_cnt[i] = 0;
+            }
+          }
+
+          // mat alleen als de kamer koud is (hysterese 0,5 °C); zonder kamersensor blijft de mat beschikbaar
+          float tr = id(t_room).state, tm = id(mat_kamer_max).state;
+          if (std::isnan(tr) || tr < tm - 0.5f) id(kamer_koud) = true;
+          else if (tr > tm + 0.5f) id(kamer_koud) = false;
+
+          // accu: eerst valt de verwarmer af, daarna de mat. INA226 is leidend, de ADC is reserve.
+          float vb = std::isnan(id(v_ina).state) ? id(v_12).state : id(v_ina).state;
+          if (!std::isnan(vb)) {
+            if (vb < id(bat_kachel_min).state) id(bat_ok_kachel) = false;
+            else if (vb > id(bat_kachel_min).state + 0.4f) id(bat_ok_kachel) = true;
+            if (vb < id(bat_mat_min).state) id(bat_ok_mat) = false;
+            else if (vb > id(bat_mat_min).state + 0.4f) id(bat_ok_mat) = true;
+          }
+
+          // hoofdschakelaar
+          bool on = id(mat_aan).state && id(mat_ok) && id(kamer_koud) && id(bat_ok_mat);
+          if (on && !id(mat_actief)) {
+            // geen opgebouwde integraal meenemen uit de rustperiode
+            id(pid_1)->reset_integral_term(); id(pid_2)->reset_integral_term(); id(pid_3)->reset_integral_term();
+            id(pid_4)->reset_integral_term(); id(pid_5)->reset_integral_term();
+          }
+          id(mat_actief) = on;
+          if (on) id(mat_main).turn_on(); else id(mat_main).turn_off();
+          esphome::gpio::GPIOBinaryOutput *fet[5] = {id(fet_1), id(fet_2), id(fet_3), id(fet_4), id(fet_5)};
+          for (int i = 0; i < 5; i++) if (!on || *fault[i]) fet[i]->turn_off();
+
+  # Ruimteverwarmer (PTC): aan onder de streefwaarde (standaard 8 °C) met hysterese, max. 60 min aan, dan 10 min pauze.
+  - interval: 5s
+    then:
+      - lambda: |-
+          static uint32_t changed = 0;
+          static bool pauze = false;
+          uint32_t now = millis();
+          float tr = id(t_room).state, sp = id(kachel_sp).state;
+          bool allowed = id(kachel_aan).state && !std::isnan(tr) && id(bat_ok_kachel);
+          bool want = id(kachel_on) ? (tr < sp + 1.0f) : (tr < sp - 0.5f);
+          if (!allowed) want = false;
+          if (pauze && now - changed < 600000) want = false; else pauze = false;
+          if (id(kachel_on) && now - changed > 3600000) { want = false; pauze = true; }
+          bool may_switch = !allowed || pauze || now - changed > 120000;
+          if (want != id(kachel_on) && may_switch) { id(kachel_on) = want; changed = now; }
+          if (id(kachel_on)) id(heat_out).turn_on(); else id(heat_out).turn_off();
+
+  # Ventilator op hygrostaat (detail 7 van het bouwplan).
+  - interval: 10s
+    then:
+      - lambda: |-
+          float rh = id(rh_room).state;
+          if (std::isnan(rh)) id(fan_on) = false;
+          else if (rh > id(rv_aan).state) id(fan_on) = true;
+          else if (rh < id(rv_aan).state - 10.0f) id(fan_on) = false;
+          if (id(fan_on)) id(fan_out).turn_on(); else id(fan_out).turn_off();

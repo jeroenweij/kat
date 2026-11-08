@@ -1,0 +1,151 @@
+# Eén matsegment: NTC-ingang, MOSFET, PID-regeling en stroomcontrole bij elk schakelmoment.
+# Variabelen: n, adc_pin, out_pin, period (verschillend per segment, zodat ze zelden tegelijk schakelen).
+
+globals:
+  - id: seg${n}_fault          # vergrendeld tot "Fouten wissen"
+    type: bool
+    restore_value: true
+    initial_value: "false"
+  - id: i_before_${n}
+    type: float
+    initial_value: "0"
+  - id: seq_at_${n}
+    type: int
+    initial_value: "0"
+  - id: quiet_${n}
+    type: bool
+    initial_value: "false"
+  - id: open_cnt_${n}
+    type: int
+    initial_value: "0"
+  - id: stuck_cnt_${n}
+    type: int
+    initial_value: "0"
+
+sensor:
+  - platform: adc
+    id: adc_${n}
+    pin: ${adc_pin}
+    attenuation: 12db
+    update_interval: 1s
+    internal: true
+    filters:
+      - median:
+          window_size: 5
+          send_every: 1
+  # 10k vast naar A3V3, NTC naar GND: de NTC zit 'downstream'
+  - platform: resistance
+    id: r_${n}
+    sensor: adc_${n}
+    configuration: DOWNSTREAM
+    resistor: 10kOhm
+    reference_voltage: 3.3V
+    internal: true
+  - platform: ntc
+    id: t_${n}
+    name: "Segment ${n} temperatuur"
+    sensor: r_${n}
+    calibration:
+      b_constant: 3950
+      reference_temperature: 25°C
+      reference_resistance: 10kOhm
+    accuracy_decimals: 1
+  - platform: pid
+    name: "Segment ${n} vermogen"
+    climate_id: pid_${n}
+    type: HEAT
+
+output:
+  - platform: gpio
+    id: fet_${n}
+    pin: ${out_pin}
+  - platform: slow_pwm
+    id: pwm_${n}
+    period: ${period}
+    turn_on_action:
+      - if:
+          condition:
+            lambda: "return id(mat_actief) && !id(seg${n}_fault);"
+          then:
+            - lambda: "id(i_before_${n}) = id(i_mat).state;"
+            - output.turn_on: fet_${n}
+            - script.execute: check_on_${n}
+    turn_off_action:
+      - lambda: "id(i_before_${n}) = id(i_mat).state;"
+      - output.turn_off: fet_${n}
+      - script.execute: check_off_${n}
+
+climate:
+  - platform: pid
+    id: pid_${n}
+    name: "Segment ${n}"
+    sensor: t_${n}
+    default_target_temperature: 34°C
+    heat_output: pwm_${n}
+    visual:
+      min_temperature: 20°C
+      max_temperature: 38°C
+      temperature_step: 0.5°C
+    # startwaarden; verfijnen met de autotune-knop
+    control_parameters:
+      kp: 0.25
+      ki: 0.0005
+      kd: 0.0
+      output_averaging_samples: 5
+
+script:
+  # Na inschakelen moet de matstroom ongeveer 0,28 A stijgen.
+  - id: check_on_${n}
+    mode: restart
+    then:
+      - lambda: |-
+          id(quiet_${n}) = (millis() - id(last_switch_ms)) > 1500;
+          id(last_switch_ms) = millis();
+          id(seq_at_${n}) = ++id(switch_seq);
+      - delay: 1500ms
+      - lambda: |-
+          // een ander segment schakelde in hetzelfde venster: geen oordeel
+          if (id(switch_seq) != id(seq_at_${n}) || !id(quiet_${n}) || !id(mat_actief)) return;
+          float d = id(i_mat).state - id(i_before_${n});
+          if (d < ${i_min}) {
+            if (++id(open_cnt_${n}) >= 3) {
+              id(seg${n}_fault) = true;
+              id(fet_${n}).turn_off();
+              ESP_LOGW("mat", "Segment ${n}: geen stroom bij inschakelen (open of draadbreuk)");
+            }
+          } else if (d > ${i_max}) {
+            id(seg${n}_fault) = true;
+            id(fet_${n}).turn_off();
+            ESP_LOGW("mat", "Segment ${n}: te veel stroom (%.2f A)", d);
+          } else {
+            id(open_cnt_${n}) = 0;
+          }
+  # Na uitschakelen moet de stroom dalen; zo niet, dan is de MOSFET doorgeslagen: hele mat uit.
+  - id: check_off_${n}
+    mode: restart
+    then:
+      - lambda: |-
+          id(quiet_${n}) = (millis() - id(last_switch_ms)) > 1500;
+          id(last_switch_ms) = millis();
+          id(seq_at_${n}) = ++id(switch_seq);
+      - delay: 1500ms
+      - lambda: |-
+          if (id(switch_seq) != id(seq_at_${n}) || !id(quiet_${n}) || !id(mat_actief)) return;
+          if (id(i_before_${n}) < ${i_min}) return;   // stond feitelijk niet aan
+          float d = id(i_before_${n}) - id(i_mat).state;
+          if (d < ${i_min}) {
+            if (++id(stuck_cnt_${n}) >= 3) {
+              id(seg${n}_fault) = true;
+              id(mat_ok) = false;
+              ESP_LOGE("mat", "Segment ${n}: stroom blijft na uitschakelen, MOSFET doorgeslagen. Hele mat uit.");
+            }
+          } else {
+            id(stuck_cnt_${n}) = 0;
+          }
+
+button:
+  - platform: template
+    name: "Segment ${n} PID autotune"
+    entity_category: config
+    on_press:
+      - climate.pid.autotune: pid_${n}
