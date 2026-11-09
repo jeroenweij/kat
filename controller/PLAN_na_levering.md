@@ -138,7 +138,7 @@ Per segment: MAT+ op pin 1 via de bimetaalschakelaar op P1, segment-min op pin 2
 
 - [ ] **[jij]** PTC-verwarmer op J2, met **F2 = 15 A**. Eerste inschakeling met een stroomtang of de INA226-gegevens
       erbij. **[Claude]** bekijkt de inschakelpiek en de temperatuur van Q7 (voelen na 10 minuten; heet = koelplaat nodig).
-- [ ] **[jij]** F1 vervangen door 20 A. Zekering bij de accu zelf (inline) plaatsen.
+- [ ] **[jij]** F1 vervangen door 20 A. (Geen accu in de chalet: de voeding komt van de Orion, zie `VOEDING.md`.)
 - [ ] **[Claude]** PID-autotune per segment met de mat in de echte opbouw (kussen of deken erop), parameters
       overnemen in `segment.yaml`.
 - [ ] **[jij]** Streefwaarden in de webinterface instellen. Standaard:
@@ -146,8 +146,9 @@ Per segment: MAT+ op pin 1 via de bimetaalschakelaar op P1, segment-min op pin 2
       - mat alleen onder kamertemperatuur 15 °C;
       - verwarmer onder 8 °C;
       - ventilator boven 75 % RV.
-- [ ] **[jij + Claude]** Accugrenzen controleren bij de echte loodaccu: verwarmer uit onder 12,2 V, mat uit onder
-      12,0 V. Bij gebruik nagaan of de verwarmer niet onnodig vroeg afvalt door spanningsval.
+- [ ] **[jij + Claude]** Spanningsgrenzen controleren met de Orion als voeding: verwarmer uit onder 11,5 V, mat uit
+      onder 11,3 V. Meten wat de INA226 ziet met de verwarmer aan; die moet ruim boven 11,9 V blijven, anders
+      valt de verwarmer af of komt hij niet terug.
 
 ## 8. Plaatsen in het chalet
 

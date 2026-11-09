@@ -1,7 +1,7 @@
 # Controller verwarmde mat
 
 Een ESP32 regelt de 5 matsegmenten elk apart, plus de PTC-verwarmer van 12 V / 100 W en de ventilator.
-Alles draait op een 12 V-accu; er is geen netstroom.
+Voeding: 24 V uit de schuur, in de chalet omgezet naar een vaste 12,2 V (zie `VOEDING.md`). Geen 230 V bij de chalet.
 Monitoren en instellen via de webinterface of via Home Assistant.
 
 ## Bestanden
@@ -13,6 +13,7 @@ Monitoren en instellen via de webinterface of via Home Assistant.
 | `kattenmat_schema.pdf` | Afdruk van het schema |
 | `esphome/kattenmat.yaml` | ESPHome-configuratie (gevalideerd met ESPHome 2026.10.2) |
 | `esphome/segment.yaml` | Pakket per segment: NTC, MOSFET, PID, stroomcontrole |
+| `VOEDING.md` | Voeding vanuit de schuur (24 V, Orion-Tr naar 12,2 V), later een 24 V-accu met zon en noodstroom in de schuur; energiebehoefte |
 | `esphome/secrets.yaml.example` | Kopieer naar `secrets.yaml` (staat in .gitignore) |
 
 ```bash
@@ -50,12 +51,18 @@ Matconnector J4 (12-polig): 1 MAT+ (via de bimetaalschakelaar in de mat), 2-6 se
 - Mat alleen actief als de kamer kouder is dan "Mat alleen onder kamertemp." (standaard 15 °C, hysterese 0,5 °C).
   Zonder kamersensor blijft de mat beschikbaar (de eigen beveiligingen blijven werken). Bij het hervatten wordt de
   integraal van de PID's gewist, zodat er geen doorschot is.
+- Ruimteverwarmer, zachte start: de verwarmer gaat via PWM (LEDC, 20 kHz op GPIO 23) en loopt na elke inschakeling
+  in 60 s op van 30 % naar het maximum (instelbaar, 0 = uit; maximum standaard 100 %). Dit beperkt de inschakelpiek
+  voor de 24 V-voeding van 250 W. Zie `VOEDING.md`.
 - Ruimteverwarmer (PTC): aan onder de streefwaarde (standaard 8 °C, aan onder 7,5 en uit boven 9 °C), minimaal 2 min
   tussen schakelen, maximaal 60 min aan en dan 10 min pauze; uit als de kamersensor ontbreekt. De buitentemperatuur
   wordt alleen gemeten en getoond.
-- Accu: de INA226 meet de accuspanning (30 s gemiddeld, zodat de inschakelpiek van de PTC niet meetelt). Onder
-  12,2 V gaat de verwarmer uit, onder 12,0 V ook de mat; weer aan bij 0,4 V hoger. Standaardwaarden voor de huidige
-  loodaccu. Na de overstap op LiFePO4 in de webinterface naar ongeveer 12,9 en 12,5 V zetten.
+- Voedingsspanning: de INA226 meet de 12 V-ingang (30 s gemiddeld, zodat de inschakelpiek van de PTC niet meetelt).
+  Onder 11,5 V gaat de verwarmer uit, onder 11,3 V ook de mat; weer aan bij 0,4 V hoger. Dit is een vangnet onder
+  de vaste 12,2 V van de Orion. Fase 2 (24 V-accu in de schuur) vraagt een 24 V-meting op GPIO 33 en grenzen voor
+  die accu: zie `VOEDING.md`. De oude grenzen 12,2 en 12,0 V waren voor een 12 V-loodaccu direct op de controller.
+  De instellingen worden onthouden (restore_value): na een eerdere flash met de oude waarden in de webinterface
+  aanpassen.
 - Wifi weg: de ESP regelt gewoon door.
 
 ## Aannames en open punten

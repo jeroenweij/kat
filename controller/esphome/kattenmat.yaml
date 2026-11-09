@@ -1,5 +1,7 @@
 # Kattenchalet: controller voor de verwarmde mat (5 segmenten), PTC-verwarmer en ventilator.
-# Voeding: 12 V-accu (geen netstroom). Bij lage accuspanning valt eerst de verwarmer af, dan de mat.
+# Voeding (9-11-2026): 24 V uit de schuur, in de chalet naar vaste 12,2 V (Orion-Tr 24/12-20), zie ../VOEDING.md.
+# Bij lage voedingsspanning valt eerst de verwarmer af, dan de mat. De grenzen staan nu laag, als vangnet
+# onder de 12,2 V van de Orion; in fase 2 (accu van 24 V in de schuur) volgt een 24 V-meting.
 # Hoort bij controller/kattenmat.kicad_sch. Webinterface op http://kattenmat.local (wachtwoord in secrets.yaml).
 #
 # Veiligheid: de ESP regelt zelfstandig; wifi is alleen om mee te kijken en in te stellen.
@@ -101,9 +103,13 @@ output:
   - platform: gpio
     id: mat_main
     pin: GPIO17
-  - platform: gpio
+  # Verwarmer via PWM, voor de zachte start (zie ../VOEDING.md): een koude PTC trekt bij inschakelen meer dan
+  # 100 W, en de 24 V-voeding van 250 W gaat bij overbelasting in hiccup. 20 kHz: buiten het hoorbare gebied;
+  # schakelverlies in Q7 (UCC27511-driver) naar schatting < 0,1 W.
+  - platform: ledc
     id: heat_out
     pin: GPIO23
+    frequency: 20000Hz
   - platform: gpio
     id: fan_out
     pin: GPIO18
@@ -183,6 +189,26 @@ number:
       - climate.control: { id: pid_4, target_temperature: !lambda "return x;" }
       - climate.control: { id: pid_5, target_temperature: !lambda "return x;" }
   - platform: template
+    id: kachel_ramp
+    name: "Verwarmer zachte start (0 = uit)"
+    optimistic: true
+    restore_value: true
+    initial_value: 60             # s van 30 % naar het maximum
+    min_value: 0
+    max_value: 300
+    step: 5
+    unit_of_measurement: "s"
+  - platform: template
+    id: kachel_max
+    name: "Verwarmer maximaal vermogen"
+    optimistic: true
+    restore_value: true
+    initial_value: 100            # verlagen als de voeding ook na de zachte start in hiccup gaat
+    min_value: 30
+    max_value: 100
+    step: 5
+    unit_of_measurement: "%"
+  - platform: template
     id: kachel_sp
     name: "Ruimteverwarmer streefwaarde"
     optimistic: true
@@ -218,7 +244,7 @@ number:
     name: "Verwarmer uit onder accuspanning"
     optimistic: true
     restore_value: true
-    initial_value: 12.2           # loodaccu: ca. 50 % onder belasting; LiFePO4: 12.9
+    initial_value: 11.5           # vangnet onder de vaste 12,2 V van de Orion (aan bij 11,9). Was 12,2 voor een 12 V-loodaccu
     min_value: 11.0
     max_value: 13.5
     step: 0.05
@@ -228,7 +254,7 @@ number:
     name: "Mat uit onder accuspanning"
     optimistic: true
     restore_value: true
-    initial_value: 12.0           # loodaccu: niet dieper ontladen; LiFePO4: 12.5
+    initial_value: 11.3           # vangnet (aan bij 11,7). Was 12,0 voor een 12 V-loodaccu
     min_value: 11.0
     max_value: 13.5
     step: 0.05
@@ -353,7 +379,8 @@ interval:
           for (int i = 0; i < 5; i++) if (!on || *fault[i]) fet[i]->turn_off();
 
   # Ruimteverwarmer (PTC): aan onder de streefwaarde (standaard 8 °C) met hysterese, max. 60 min aan, dan 10 min pauze.
-  - interval: 5s
+  # Zachte start: na elke inschakeling loopt de PWM in "zachte start" seconden op van 30 % naar het maximum.
+  - interval: 1s
     then:
       - lambda: |-
           static uint32_t changed = 0;
@@ -367,7 +394,15 @@ interval:
           if (id(kachel_on) && now - changed > 3600000) { want = false; pauze = true; }
           bool may_switch = !allowed || pauze || now - changed > 120000;
           if (want != id(kachel_on) && may_switch) { id(kachel_on) = want; changed = now; }
-          if (id(kachel_on)) id(heat_out).turn_on(); else id(heat_out).turn_off();
+          float duty = 0.0f;
+          if (id(kachel_on)) {
+            float vmax = id(kachel_max).state / 100.0f, ramp = id(kachel_ramp).state * 1000.0f;
+            if (std::isnan(vmax)) vmax = 1.0f;
+            duty = vmax;
+            if (!std::isnan(ramp) && ramp > 0.0f && now - changed < ramp)
+              duty = std::min(vmax, 0.3f + 0.7f * (now - changed) / ramp);
+          }
+          id(heat_out).set_level(duty);
 
   # Ventilator op hygrostaat (detail 7 van het bouwplan).
   - interval: 10s
