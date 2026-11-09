@@ -200,29 +200,57 @@ for a, b in zip(SIDE_Y, SIDE_Y[1:]):
 add("Binnenplaat", g, "LP9", XL1, IN_X0, IN_Y0, IN_Y1, Z0, Z1)
 
 g = "E Scheidingswand"
-CAT_H = 260
 CAT_Y1 = IN_Y1 - S            # 627
-CAT_Y0 = CAT_Y1 - 190         # 437
+CAT_Y0 = CAT_Y1 - 200         # 427: 200 tussen de stijlen; luikframe 198 breed, zonder binnenframe
+FLAP_W, FLAP_H, FLAP_Z = 158, 185, 120     # zaagmaat PetSafe 700 S (breed x hoog); onderkant uitsparing op buikhoogte
+CAT_H = FLAP_Z + FLAP_H + 5   # 310: latei net boven het luik; trapzijde open, verandazijde dicht met kattenluik
+VENT_W, VENT_H, VENT_Z = 140, 70, 15   # luchtinlaat laag onder het luik: koude lucht blijft beneden, trapkamer houdt warmte
+FLAP_FW, FLAP_FH = 198, 236                  # buitenmaat frame (bol, nameten)
+FLAP_Y0 = mid(CAT_Y0, CAT_Y1) - FLAP_W // 2
+FLAP_Y1 = FLAP_Y0 + FLAP_W
+VENT_E = (mid(CAT_Y0, CAT_Y1) - VENT_W // 2, mid(CAT_Y0, CAT_Y1) + VENT_W // 2,
+          Z0 + VENT_Z, Z0 + VENT_Z + VENT_H)
+
+
+def plate(name, group, x0, x1, y0, y1, z0, z1, holes, **kw):
+    """Plaat in het y-z-vlak met rechthoekige gaten (y0, y1, z0, z1); eerste stuk telt voor de zaaglijst."""
+    ys = sorted({y0, y1} | {e for h in holes for e in h[:2] if y0 < e < y1})
+    first = True
+    for a, b in zip(ys, ys[1:]):
+        zs = [(z0, z1)]
+        for h in holes:
+            if h[0] <= a and b <= h[1]:
+                zs = [s for za, zb in zs for s in ((za, min(zb, h[2])), (max(za, h[3]), zb)) if s[1] - s[0] > 0.01]
+        for za, zb in zs:
+            if first:
+                add(name, group, "LP9", x0, x1, a, b, za, zb, cut=(round(y1 - y0), round(z1 - z0), PLY), **kw)
+                first = False
+            else:
+                add(name, group, "LP9", x0, x1, a, b, za, zb, count=False)
+
+
 add("Onderregel voorste deel", g, "B69", PART_X0, PART_X1, F1, CAT_Y0, Z0, Z0 + S)
-add("Onderregel achterste deel", g, "B69", PART_X0, PART_X1, CAT_Y1, IN_Y1, Z0, Z0 + S)
 add("Bovenregel", g, "B69", PART_X0, PART_X1, F1, IN_Y1, Z1 - S, Z1)
-for y in (F1, mid(F1, CAT_Y0 - S), CAT_Y0 - S, CAT_Y1):
+for y in (F1, CAT_Y0 - S):
     add("Stijl", g, "B69", PART_X0, PART_X1, y, y + S, Z0 + S, Z1 - S)
+add("Stijl achter doorgang", g, "B69", PART_X0, PART_X1, CAT_Y1, IN_Y1, Z0, Z1 - S, note="tot op de vloer: geen los stukje onderregel")
 add("Latei kattenopening", g, "B69", PART_X0, PART_X1, CAT_Y0, CAT_Y1, Z0 + CAT_H, Z0 + CAT_H + S)
-E_STUD = (F1, mid(F1, CAT_Y0 - S), CAT_Y0 - S)
-for a, b in zip(E_STUD, E_STUD[1:]):
-    add_pir("PIR wand", g, PART_X0, PART_X1, a + S, b, Z0 + S, Z1 - S)
+add_pir("PIR wand", g, PART_X0, PART_X1, F1 + S, CAT_Y0 - S, Z0 + S, Z1 - S)
 add_pir("PIR boven doorgang", g, PART_X0, PART_X1, CAT_Y0, CAT_Y1, Z0 + CAT_H + S, Z1 - S)
-for lbl, xa, ya in (("trapzijde", ROOM_X1, IN_Y0), ("verandazijde", PART_X1, CLAD)):
-    # trapzijde stopt tegen het kozijn; in de open veranda loopt de plaat door tot achter de kaderstijl
-    add(f"Plaat {lbl}", g, "LP9", xa, xa + PLY, ya, CAT_Y0, Z0, Z1, cut=(IN_Y1 - ya, ROOM_H, PLY),
-        note=f"uit een stuk; doorgang {CAT_Y1 - CAT_Y0}x{CAT_H} uitzagen, randen afronden")
-    add(f"Plaat {lbl}", g, "LP9", xa, xa + PLY, CAT_Y1, IN_Y1, Z0, Z1, count=False)
-    add(f"Plaat {lbl}", g, "LP9", xa, xa + PLY, CAT_Y0, CAT_Y1, Z0 + CAT_H, Z1, count=False)
+plate("Plaat trapzijde", g, ROOM_X1, ROOM_X1 + PLY, IN_Y0, IN_Y1, Z0, Z1,
+      [(CAT_Y0, CAT_Y1, Z0, Z0 + CAT_H)],
+      note=f"uit een stuk; doorgang {CAT_Y1 - CAT_Y0}x{CAT_H} uitzagen, randen afronden")
+plate("Plaat verandazijde", g, PART_X1, PART_X1 + PLY, CLAD, IN_Y1, Z0, Z1,
+      [(FLAP_Y0, FLAP_Y1, Z0 + FLAP_Z, Z0 + FLAP_Z + FLAP_H), VENT_E],
+      note=f"uit een stuk; kattenluik {FLAP_W}x{FLAP_H} op {FLAP_Z} boven de vloer en luchtinlaat {VENT_W}x{VENT_H} op {VENT_Z} uitzagen")
+plate("Versterking kattenluik", g, PART_X1 - PLY, PART_X1, CAT_Y0, CAT_Y1, Z0, Z0 + CAT_H,
+      [(FLAP_Y0, FLAP_Y1, Z0 + FLAP_Z, Z0 + FLAP_Z + FLAP_H), VENT_E],
+      note="restplaat, achter de verandaplaat gelijmd tussen de stijlen; uitsparing na het lijmen, door beide platen")
 
 g = "F Rechterwand beneden"
-wall_y(g, XR0, XR1, F0, IN_Y1, Z0, (F0,) + SIDE_Y)
-for a, b in zip(SIDE_Y, SIDE_Y[1:]):
+F_STUD = (F0, mid(F0, IN_Y1 - S), IN_Y1 - S)   # voorste stijl op de voorrand, middenstijl precies in het midden
+wall_y(g, XR0, XR1, F0, IN_Y1, Z0, F_STUD)
+for a, b in zip(F_STUD, F_STUD[1:]):
     add_pir("PIR wand", g, XR0, XR1, a + S, b, Z0 + S, Z1 - S)
 add("Binnenplaat", g, "LP9", IN_X1, XR0, CLAD, IN_Y1, Z0, Z1, note="loopt door tot achter de afdekking wandkop")
 

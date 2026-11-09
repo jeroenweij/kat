@@ -16,7 +16,7 @@ def magnus(t):
     return p / (461.5 * (t + 273.15)) * 1000
 
 
-STACK_H = (m.VENT["z"] - (m.Z_DECK + m.ROOM_H / 2)) / 1000   # afvoer boven het midden van de veranda
+STACK_H = (m.VENT["z"] - (m.VENT_E[2] + m.VENT_E[3]) / 2) / 1000   # afvoer boven de lage inlaat in wand E
 
 
 def stack_flow(diam_mm, t_out, h=STACK_H, cd=0.5):
