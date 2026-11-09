@@ -307,6 +307,14 @@ def plan(view, zc, only=None):
             rect(view, w["x0"] + 118, w["x1"] - 118, w["y0"] - 8, w["y0"] + 16, C("#bfdcec"), lw=0.3)
 
 
+def depth_dims(v, x):
+    """Diepte van een frame: rand voor, balk, rand achter, en totaal."""
+    ys = [m.F0, m.F1, m.YR, m.YB1]
+    for a, b in zip(ys, ys[1:]):
+        dim(v, x, a, x, b, 4, size=5.3)
+    dim(v, x, m.F0, x, m.YB1, 10, size=6)
+
+
 def legend(c, x, y):
     label(c, x, y + 4, "Legenda", 7, True)
     for i, (k, t) in enumerate(LEGEND):
@@ -399,7 +407,7 @@ def visible_outside(p):
     if p.group[0] == "Q" or p.group[0] == "A":
         return True
     if p.group[0] == "M":
-        return not p.name.startswith(("Spoor", "Onderplaat"))
+        return not p.name.startswith(("Spoor", "Zijspoor", "Rijklos", "Onderplaat"))
     if p.mat == m.MAT["LP9"]:
         return p.name in ("Plaat verandazijde", "Onderplaat tussenvloer") or p.group[0] in "CF"
     return False
@@ -509,6 +517,8 @@ STOCK = {"R44": {3600: 5.29, 2400: 3.55}, "B69": {3600: 6.49, 3000: 5.40, 2400: 
 
 def bars(items, stocks, kerf=4, margin=10, n_fixed=None):
     """Eerst n_long lange latten, daarna korte; houdt de goedkoopste indeling, of n_fixed lange. margin: tolerantie Hornbach."""
+    if not items:
+        return []
     items = sorted(items, key=lambda i: -i[0])
     lens = sorted(stocks, reverse=True)
     best = None
@@ -585,7 +595,10 @@ def walls_page(sh, title, walls):
             rect(view, p.box[ax[0]] - u0, p.box[ax[1]] - u0, p.box[4] - zmin, p.box[5] - zmin, FILL[p.mat], lw=0.15)
         for p in frame:
             rect(view, p.box[ax[0]] - u0, p.box[ax[1]] - u0, p.box[4] - zmin, p.box[5] - zmin, FILL[p.mat], lw=0.35)
+        name, _, sub = name.partition(" | ")
         view_title(c, cx, cy + 66, name)
+        if sub:
+            label(c, cx, cy + 62, sub, 6)
         stems = sorted({(round(p.box[ax[0]] - u0), round(p.box[ax[1]] - u0)) for p in frame
                         if (p.box[5] - p.box[4]) > 100})
         h = max(p.box[5] for p in frame) - zmin
@@ -596,6 +609,10 @@ def walls_page(sh, title, walls):
                 dim(view, a, 0, b, 0, -3.5, size=5.3)
         dim(view, 0, 0, u1 - u0, 0, -8, size=6)
         dim(view, u1 - u0, 0, u1 - u0, h, 3.5, size=6)
+        zs = sorted({round(e - zmin) for p in frame if (p.box[5] - p.box[4]) <= 100 for e in (p.box[4], p.box[5])} | {0, round(h)})
+        if len(zs) > 2:
+            for a, b in zip(zs, zs[1:]):
+                dim(view, 0, a, 0, b, -3.5, size=5.3)
     c.setFont("D", 7)
     c.setFillColor(INK)
     c.drawString(18 * mm, 16 * mm, "Regelwerk gezien vanaf de BUITENZIJDE. Plaat en spouwlatten zijn weggelaten. Geel = PIR. Maten van wandbegin tot stijl-randen.")
@@ -661,11 +678,11 @@ def details_page(sh):
     leader(v, 44, 3, 214, 254, "EPDM onder het kozijn, over de band, tot op de dorpel")
     leader(v, -22, -16, 214, 248, "Alu lekdorpelprofiel 34x17 tegen de band, loopt af naar buiten")
     leader(v, 30, -20, 214, 242, "Lat band: bovenkant gelijk met vloer, kozijn steunt erop")
-    label(c, 214, 232, f"Tussen stijlen {m.XR0-m.XL1} x {m.ROOM_H}, beneden {m.PART_X0-m.XL1} x {m.ROOM_H}.", 6.3, True)
+    label(c, 214, 232, f"Tussen stijlen {m.XR0-m.XL1} x {m.ROOM_H}, beneden {m.PART_X0-m.XL1} x {m.ROOM_H}: {m.WIN_GAP} mm speling per kant.", 6.3, True)
     label(c, 214, 228, "Geen dorpellat, geen houten opstand: kozijn direct op vloer.", 6)
     label(c, 214, 224, "Schroef 7,5x112 zijkant en boven: max. 150 uit hoek,", 6)
-    label(c, 214, 220, "max. 600 h.o.h.; onder niet schroeven. Voeg 9 per kant;", 6)
-    label(c, 214, 216, f"kozijn raakt stijl over {m.WIN_D-m.F0} mm: voorboren, klossen, niet krom.", 6)
+    label(c, 214, 220, "max. 600 h.o.h.; onder niet schroeven. Stijlen strak ertegen;", 6)
+    label(c, 214, 216, f"kozijn raakt stijl over {m.WIN_D-m.F0} mm: voorboren, stijl recht, niet krom.", 6)
     label(c, 214, 210, "Controleer de afwateringssleuven op het kozijn: na", 6)
     label(c, 214, 206, "omkeren wateren die naar de binnenzijde af, in de goot.", 6)
 
@@ -684,7 +701,7 @@ def details_page(sh):
     poly(v, [(-150, base + ztop(-150)), (250, base + ztop(250)), (250, base + ztop(250) + m.OSB_T), (-150, base + ztop(-150) + m.OSB_T)], FILL[m.MAT["OSB"]])
     rect(v, -132, -15, base - m.SOF_T, base, floor18)
     rect(v, -150, -132, base - 33, base + m.RAFT_F + m.OSB_T, dark)
-    leader(v, 100, base + 58, 286, 272, f"EPDM 1,2 op OSB-3 11; afschot 1:{SLOPE} naar achter")
+    leader(v, 100, base + 58, 286, 272, f"EPDM 1,14 op OSB-3 11; afschot 1:{SLOPE} naar achter")
     leader(v, 40, base + 30, 286, 266, "Ventilatieruimte 28-57 tussen sporen, voor en achter open")
     leader(v, -8, base - 3, 286, 260, "Spleet 15 mm met RVS gaas: spouw en dak ventileren hier")
     leader(v, 120, m.PLY + 20, 286, 254, "PIR 70 op plafondplaat; plafond Elliotis Pine 9")
@@ -910,7 +927,7 @@ def bars_page(sh):
         "Hornbach mag tot 1 cm korter leveren: meet de lat eerst en houd die marge aan het eind (de rest) over.",
         "Letter = bouwdeel, zoals in de zaaglijst en op de wandframes T8 en T9. Vink het hokje af als de balk gezaagd is.",
         "Schrijf bouwdeel en naam met potlood op elk stuk. Gelijke stukken (stijlen 417, balken 596) mogen onderling wisselen.",
-        "Sporen M: eerst op lengte 1039 zagen, daarna de schuine snede volgens T7.",
+        f"Sporen en zijsporen M: eerst op lengte {m.RAFT_L} zagen, daarna de schuine snede volgens T7.",
         f"Poten A: hier nominaal {m.Z_LEG-m.Z_POST} mm; zaag elke poot pas op maat bij het stellen, zodat de vloer waterpas komt.",
         "Spouwlatten: hier als hele stukken getekend. Met een las op een stijl volstaan 10 latten (inkooplijst);",
         "zaag dan de korte stukken uit de resten van de latten links, rechts en achter.",
@@ -1035,6 +1052,7 @@ def write_drawings(path):
     dim(v, 0, 0, m.W, 0, -6, str(m.W), 6)
     dim(v, m.IN_X0, m.IN_Y1, m.IN_X1, m.IN_Y1, 12, str(m.IN_X1 - m.IN_X0), 6)
     dim(v, m.IN_X1, m.IN_Y0, m.IN_X1, m.IN_Y1, 13, str(m.IN_Y1 - m.IN_Y0), 6)
+    dim(v, 0, 0, 0, m.D, -6, str(m.D), 6)
     dim(v, m.HOLE_X0, m.HOLE_Y1, m.HOLE_X1, m.HOLE_Y1, -17, f"gat {m.HOLE_X1-m.HOLE_X0}", 5.5)
     label(c, 225, 257.5, "Raam voor, trapgat linksachter, afvoer rechtsachter, verwarming rechterwand, mand bij het raam.", 6.5)
     v = View(c, 40, 46, 10)
@@ -1044,6 +1062,18 @@ def write_drawings(path):
     for a, b in zip(xs, xs[1:]):
         dim(v, a, m.YB1, b, m.YB1, 4, size=5.3)
     dim(v, m.F0, m.F0, m.XR1, m.F0, -5, str(m.XR1 - m.F0), 6)
+    depth_dims(v, m.XR1)
+    c.setDash(2, 1.5)
+    for lx in m.LEG_X:
+        for ly in m.LEG_Y:
+            rect(v, lx[0], lx[1], ly[0], ly[1], None, stroke=ACC, lw=0.5)
+    c.setDash()
+    cx = [(a + b) / 2 for a, b in m.LEG_X]
+    cy = [(a + b) / 2 for a, b in m.LEG_Y]
+    for a, b in zip(cx, cx[1:]):
+        dim(v, a, m.F0, b, m.F0, -11, f"{round(b - a)} h.o.h. poot", 5.3)
+    dim(v, m.F0, cy[0], m.F0, cy[1], -6, f"{round(cy[1] - cy[0])} h.o.h. poot", 5.3)
+    label(c, 40, 135.5, "Stippellijn: poten 68 x 68 onder het frame.", 6)
     v = View(c, 225, 46, 10)
     view_title(c, 225, 140, "Tussenvloer: balken en PIR (bovenplaat weg)")
     plan(v, m.Z_MID_T - 1, only=lambda p: p.group.startswith("G") and "plaat" not in p.name.lower())
@@ -1051,6 +1081,11 @@ def write_drawings(path):
     for a, b in zip(xs, xs[1:]):
         dim(v, a, m.YB1, b, m.YB1, 4, size=5.3)
     dim(v, m.F0, m.F0, m.XR1, m.F0, -5, str(m.XR1 - m.F0), 6)
+    depth_dims(v, m.XR1)
+    for a, b, t in ((m.F0, m.HOLE_Y0, None), (m.HOLE_Y0, m.HOLE_Y1, f"gat {m.HOLE_Y1 - m.HOLE_Y0}"), (m.HOLE_Y1, m.YB1, None)):
+        dim(v, m.F0, a, m.F0, b, -5, t, 5.3)
+    dim(v, m.F0, m.HOLE_Y0, m.HOLE_X0, m.HOLE_Y0, -3, size=5.3)
+    label(c, 225, 135.5, f"Trapgat {HOLE} in onderplaat en vloerplaat: {m.HOLE_X0 - m.F0} uit de linkerrand, {m.YB1 - m.HOLE_Y1} uit de achterrand.", 6)
     legend(c, 18, 28)
 
     # T7 dakplattegronden
@@ -1062,31 +1097,39 @@ def write_drawings(path):
     for a, b in zip(xs, xs[1:]):
         dim(v, a, m.YB1, b, m.YB1, 4, size=5.3)
     dim(v, m.F0, m.F0, m.XR1, m.F0, -5, str(m.XR1 - m.F0), 6)
+    depth_dims(v, m.XR1)
     v = View(c, 245, 150, 10)
     view_title(c, 225, 262, "Dak: sporen en overstek (dakplaat weg)")
     plan(v, m.Z_RAFT + 70, only=lambda p: p.group.startswith("M") and p.mat != m.MAT["OSB"])
     dim(v, m.ROOF_X0, m.ROOF_Y0, m.ROOF_X1, m.ROOF_Y0, -5, str(m.ROOF_W), 6)
     dim(v, m.ROOF_X0, m.ROOF_Y0, m.ROOF_X0, m.ROOF_Y1, -6, str(m.ROOF_L), 6)
     dim(v, 0, m.ROOF_Y1, m.F0, m.ROOF_Y1, 4, size=5.3)
+    for a, b in ((m.ROOF_Y0, 0), (0, m.D), (m.D, m.ROOF_Y1)):
+        dim(v, m.ROOF_X1, a, m.ROOF_X1, b, 4, size=5.3)
+    dim(v, m.ROOF_X0, m.ROOF_Y0, 0, m.ROOF_Y0, -10, size=5.3)
+    ks = [m.RAFT_Y0] + [e for y in m.KLOS_Y for e in (y, y + m.S)] + [m.RAFT_Y1]
+    for a, b in zip(ks, ks[1:]):
+        dim(v, m.ROOF_X0, a, m.ROOF_X0, b, -2.5, size=4.8)
+    label(c, 225, 92, f"Links: maten van de rijklossen ({m.CEIL_X[0] - m.SIDE_RAFT[0] - m.S} lang) langs het zijspoor, vanaf de voorkant van de sporen. Rechts: overstek, gevel en dak.", 6)
     v = View(c, 45, 45, 10)
-    view_title(c, 40, 62, "Spoor, zijaanzicht (5 stuks)")
-    poly(v, [(0, 0), (m.ROOF_L, 0), (m.ROOF_L, m.RAFT_B), (0, m.RAFT_F)], FILL[m.MAT["B69"]], lw=0.4)
-    dim(v, 0, 0, m.ROOF_L, 0, -5, str(m.ROOF_L), 6)
-    dim(v, 0, 0, 0, m.RAFT_F, -5, str(m.RAFT_F), 5.5)
-    dim(v, m.ROOF_L, 0, m.ROOF_L, m.RAFT_B, 4, str(m.RAFT_B), 5.5)
+    view_title(c, 40, 62, f"Spoor, zijaanzicht ({len(m.CEIL_X)} sporen + 2 zijsporen)")
+    poly(v, [(0, 0), (m.RAFT_L, 0), (m.RAFT_L, m.RAFT_H1), (0, m.RAFT_H0)], FILL[m.MAT["B69"]], lw=0.4)
+    dim(v, 0, 0, m.RAFT_L, 0, -5, str(m.RAFT_L), 6)
+    dim(v, 0, 0, 0, m.RAFT_H0, -5, str(m.RAFT_H0), 5.5)
+    dim(v, m.RAFT_L, 0, m.RAFT_L, m.RAFT_H1, 4, str(m.RAFT_H1), 5.5)
     label(c, 110, 36, f"Uit balk 44x69: schuine zaagsnede. Afschot 1:{SLOPE} naar de achterkant. Dakgoot achter, afvoer weg van de schutting.", 7)
     legend(c, 18, 28)
 
     # T8, T9 wanden
     walls_page(sh, "Wandframes beneden", [
-        ("B Voorwand beneden", "x", m.F0, m.PART_X1, f"B  Voorwand beneden, {m.PART_X1-m.F0} breed (raam ertussen)", False),
+        ("B Voorwand beneden", "x", m.F0, m.PART_X1, f"B  Voorwand beneden, {m.PART_X1-m.F0} breed | Opening {m.PART_X0-m.XL1} = raam {m.WIN_L_W} + 2 x {m.WIN_GAP} speling. Stijlen pas definitief vast als het raam staat.", False),
         ("C Achterwand beneden", "x", m.F0, m.XR1, f"C  Achterwand beneden, {m.XR1-m.F0} lang", False),
         ("D Linkerwand beneden", "y", m.F1, m.IN_Y1, f"D  Linkerwand beneden, {m.IN_Y1-m.F1} lang", False),
         ("E Scheidingswand", "y", m.F1, m.IN_Y1, f"E  Scheidingswand, {m.IN_Y1-m.F1} lang (doorgang 190 x 260)", False),
         ("F Rechterwand beneden", "y", m.F0, m.IN_Y1, f"F  Rechterwand beneden, {m.IN_Y1-m.F0} lang, geheel dicht", False),
     ])
     walls_page(sh, "Wandframes boven", [
-        ("H Voorwand boven", "x", m.F0, m.XR1, f"H  Voorwand boven, {m.XR1-m.F0} breed (alleen hoekstijlen, raam ertussen)", False),
+        ("H Voorwand boven", "x", m.F0, m.XR1, f"H  Voorwand boven, {m.XR1-m.F0} breed | Opening {m.XR0-m.XL1} = raam {m.WIN_U_W} + 2 x {m.WIN_GAP} speling. Stijlen pas definitief vast als het raam staat.", False),
         ("I Achterwand boven", "x", m.F0, m.XR1, f"I  Achterwand boven, {m.XR1-m.F0} lang", False),
         ("J Linkerwand boven", "y", m.F1, m.IN_Y1, f"J  Linkerwand boven, {m.IN_Y1-m.F1} lang", False),
         ("K Rechterwand boven", "y", m.F1, m.IN_Y1, f"K  Rechterwand boven, {m.IN_Y1-m.F1} lang", False),
@@ -1183,8 +1226,7 @@ def purchase():
         ("Dampopen waterkerende gevelfolie, Sd ≤ 0,1 m, ca. 10 m²", 1, "rol/stuk", None, C_, "Niet gevonden bij Hornbach; vestiging vragen of bouwmarkt"),
         ("Alu-tape PIR, 50 mm", 1, "rol", None, C_, ""),
         ("RVS 304 gaas, 20 mazen, ca. 1 mm, 40 x 200 cm (Amazon B0DL5P11F2)", 1, "rol", 18.99, "Eigen invoer, Amazon", "Spouw en ventilatiebuis. Maaswijdte bij ontvangst nameten"),
-        ("SOUDAL Soudaband BG1 20/5-10, 5,6 m (art. 12731245)", 1, "rol", 8.45, H, "Gecontroleerd; 4 m nodig, alleen de zijvoegen"),
-        ("Dak", None, None, None, None, None),
+                ("Dak", None, None, None, None, None),
         ("Premiumfol EPDM 1,2 mm, breedte 2,8 m, per m (art. 10469549)", 1.5, "m", 38.92, H, "Gecontroleerd; maatwerk: geen retour. Reststrook is de goot onder de ramen"),
         ("EPDM-lijm en kit (Premiumfol/Berdal)", 1, "set", None, C_, "Spray 6-8 m² per bus volgens datablad"),
         ("SOLOTRIM daktrim alu 60x55, 2500 (art. 5581276)", 3, "st", 49.95, H, "Gecontroleerd; schroeven en neopreen ringen los"),
@@ -1258,7 +1300,7 @@ def write_text(path_a, path_b):
     A += [P("Jouw keuzes", "h2")]
     for t in (
         "<b>Geen toegangsluiken.</b> De ramen zijn de toegang en zitten binnenstebuiten, gelijk met de gevel.",
-        f"<b>Zo klein mogelijk rond het bovenraam.</b> Het raam van 1000 mm past precies tussen de binnenplaten van de linker- en rechterwand, zonder raamstijlen ernaast. Daardoor is het chalet {m.W} mm breed. De kamers zijn {m.IN_Y1-m.IN_Y0} mm diep, gemeten vanaf de achterkant van het kozijn; buitenmaat {m.D} mm.",
+        f"<b>Zo klein mogelijk rond het bovenraam.</b> Het raam van 1000 mm zit tussen twee hoekstijlen die er strak tegenaan komen, met {m.WIN_GAP} mm speling per kant. Daardoor is het chalet {m.W} mm breed. De binnenplaten steken {m.IN_X0 - m.WIN_X0} mm voorbij het kozijn. De kamers zijn {m.IN_Y1-m.IN_Y0} mm diep, gemeten vanaf de achterkant van het kozijn; buitenmaat {m.D} mm.",
         f"<b>Kozijn direct op de vloer, geen dorpellat.</b> Kamers {m.ROOM_H} mm hoog: raam {m.WIN_H} plus {m.WIN_JOINT} mm montagevoeg boven, zodat het kozijn past en het plafond er niet op rust. Totale hoogte {round(m.Z_TOP)} mm, onder de 1650-1750 uit de overdracht. Dit geeft minder waterreserve dan de eerdere opstand van 30 mm; zie 'Ramen binnenstebuiten'.",
         f"<b>Zijkant veranda dicht.</b> Toegang alleen via de voorkant. De verandapaal vervalt, waardoor de veranda {m.IN_X1-m.VER_X0} mm breed wordt.",
         f"<b>Trap tegen de linkerwand,</b> stijgend van voor naar achter, met het trapgat linksachter. De voet van de trapboom staat {m.ST_Y0-m.IN_Y0} mm achter het kozijn, vrij van de EPDM-rand; dat kan, omdat de vleugel nu naar buiten draait. Helling {STAIR_DEG}°, jouw keuze.",
@@ -1282,7 +1324,7 @@ def write_text(path_a, path_b):
              ["Wandbekleding", "Jouw keuze", "Elliotis Pine 9 mm, 2440 x 1220 (art. 10000081), blank gelakt. Bovenkamer prima. Veranda en trapkamer: goed afwerken, zie 'Plaatmateriaal'."],
              ["Vloeren", "Jouw keuze", "Betonplex 12 mm (art. 12628592). Sterk genoeg voor kat en mand, niet om op te staan of te knielen."],
              ["Isolatie", "Jouw keuze", "PIR 70 mm alu in regels 44 x 69, geen vezels voor de kat. Eén pak van 5,04 m² (7 platen). De plaat is 1 mm dikker dan de regel: hij drukt in tegen de folie."],
-             ["Wanden beneden", "Jouw keuze", "De rest van de PIR gaat in de buitenwanden van trapkamer en veranda. Dat levert weinig warmte op, want die ruimtes zijn onverwarmd en de veranda staat open, maar er blijft minder materiaal over."],
+             ["Wanden beneden", "Jouw keuze", "PIR ook in de buitenwanden van trapkamer en veranda en in de scheidingswand (44 x 69, jouw keuze). Dat levert weinig warmte op, want die ruimtes zijn onverwarmd en de veranda staat open."],
              ["Dampopbouw", "Mijn advies", "Alu-PIR met getapete naden als dampscherm, geen extra folie. Buiten dampopen waterkerende folie."],
              ["Dak", "Mijn advies", f"Koud dak: PIR op plafondplaat, geventileerde ruimte, OSB-3 11 mm (jouw keuze), EPDM. Afschot 1:{SLOPE} naar achter. Niet op het dak staan."],
              ["Tussenvloer", "Mijn advies", "PIR 70 mm vult de hele holte tussen de balken. De plaat is 1 mm dikker dan de balk: schuur of druk hem in, zodat de vloer vlak blijft."],
@@ -1362,7 +1404,7 @@ def write_text(path_a, path_b):
             P(f"<b>Waarom niet los of alleen op de tegels.</b> Zonder verankering kantelt het chalet bij wind op de voor- of achterkant al rond {round(r['v_free'],-1):.0f} km/h. Een tegel van 60 x 60 x 5 cm weegt ongeveer 41 kg (aanname voor het formaat), minder dan de trek per poot, en ligt los op het zand."),
             P("<b>Wind in Rijswijk.</b> Rijswijk ligt volgens mijn schatting in de kuststrook van ca. 10 km die het KNMI hanteert. Meetstations die ik op de kaart aanneem als Rotterdam en Valkenburg (KNMI TR-306, 1961-2007): stoot van 108 km/h eens per 2-3 jaar, 130 km/h eens per 10-20 jaar, ongeveer 145 km/h eens per 50 jaar. Die cijfers gelden voor open terrein op ca. 10 m hoogte. In een bebouwde tuin op 1,5 m hoogte is de wind lager; ik neem ca. 20 % aan, maar dat is niet gemeten.")])]
     A += [P("Sterkte", "h2")]
-    A += [P(f"Dakplaat OSB-3 {m.OSB_T} mm (jouw keuze) op sporen {m.CEIL_X[1]-m.CEIL_X[0]} mm hart op hart: met 70 kg/m² sneeuw doorbuiging ongeveer 0,1-0,2 mm en spanning circa 0,3 MPa, ruim onder de sterkte van OSB-3 (circa 16 MPa, EN 12369-1, niet nagezocht). Het zwakke punt is de bevestiging van de daktrim, zie het stappenplan. Niet berekend: een knie of ladder op de plaat; ga daarom niet op het dak staan.")]
+    A += [P(f"Dakplaat OSB-3 {m.OSB_T} mm (jouw keuze) op sporen {m.CEIL_X[1]-m.CEIL_X[0]} mm hart op hart: met 70 kg/m² sneeuw doorbuiging ongeveer 0,1-0,2 mm en spanning circa 0,3 MPa, ruim onder de sterkte van OSB-3 (circa 16 MPa, EN 12369-1, niet nagezocht). De plaatrand ligt rondom op sporen, zijsporen en boeiboorden, zodat de daktrimschroeven in hout uitkomen. Niet berekend: een knie of ladder op de plaat; ga daarom niet op het dak staan.")]
     A += [P(f"Plafondrand boven het raam (44 x 69, overspanning {m.XR0-m.XL1} mm): dak plus 70 kg/m² sneeuw geeft ongeveer 0,57 kN/m, buigspanning circa 2,1 MPa en doorbuiging circa 0,7 mm, binnen de voeg van {m.WIN_JOINT} mm. Die voeg is nodig: zo komt het dak niet op het kozijn te rusten. Vloerrand boven de veranda (44 x 69, {m.XR0-m.PART_X1} mm): ruim voldoende. Dit is een eenvoudige controle zonder rekenmodel van een constructeur; vuren van Hornbach is niet als C24 gesorteerd.")]
 
     A += [Spacer(1, 10), P("Veiligheid voor de kat", "h1")]
@@ -1425,29 +1467,105 @@ def write_text(path_a, path_b):
             else:
                 rows.append([name, art or "", qt, f"€{nl(price,2)}", f"€{nl(q*price,2)}", st or src or ""])
     Bd += [T(rows, [66, 19, 16, 15, 17, 45])]
-    Bd += [Spacer(1, 6), P("<b>Eerst bij Hornbach controleren:</b> geïmpregneerde balk 44 x 69, gebruiksklasse van de spouwlat, gevelfolie, alu-cachering van de PIR en OSB per plaat. Het EPDM wordt op maat gemaakt en kan niet retour, dus bestel het als de dakmaat vaststaat.")]
+    Bd += [Spacer(1, 6), P("<b>Eerst bij Hornbach controleren:</b> geïmpregneerde balk 44 x 69, gebruiksklasse van de spouwlat, gevelfolie, alu-cachering van de PIR en OSB per plaat. EPDM, Coverbond, EPDM-kit en daktrim zijn besteld bij Dakvoordeelshop, levering week 46.")]
     Bd += [PageBreak(), P("Stappenplan", "h1")]
+    # maten voor het stappenplan, uit het model
+    FR_DIAG = round(math.hypot(m.XR1 - m.F0, m.YB1 - m.F0))
+    LEG_DIAG = round(math.hypot(m.LEG_X[2][0] - m.LEG_X[0][0], LEG_DY))
+    BALK = m.YR - m.F1
+    PLATE_H = m.ROOM_H - 4
+    E_X = m.PART_X0 - m.F0
+    HOLE_L, HOLE_B = m.HOLE_X0 - m.F0, m.YB1 - m.HOLE_Y1
+    CAT_B = m.IN_Y1 - m.CAT_Y1
+    VENT_R, VENT_Z = m.XR1 - m.VENT["x"], m.VENT["z"] - m.Z_UP
+    OV_F, OV_B, OV_S = m.F0 - m.RAFT_Y0, m.RAFT_Y1 - m.YB1, m.F0 - m.SIDE_RAFT[0]
+    KLOS = m.CEIL_X[0] - (m.SIDE_RAFT[0] + m.S)
     steps = [
-        ("Voorbereiding", ["Kies de plek. Houd de voorkant vrij om bij de ramen en de veranda te komen.", "Bespreek met een installateur de voeding, de aardlek en de positie van de thermostaatkast.", "Controleer de gemarkeerde artikelen bij Hornbach en bestel eerst de ramen."]),
-        ("Ramen inmeten", ["Meet beide kozijnen na ontvangst op drie plekken in breedte en hoogte. Is een maat anders dan 1000 x 500 of 500 x 500, pas dan het model aan voor je zaagt: de breedte en kamerhoogte van het hele chalet hangen hiervan af.", "Bekijk de scharnierzijde, glaslatten en afwateringssleuven. Monteer de greep en test kiep- en draaistand met het raam omgekeerd op de werkbank."]),
-        ("Hout voorbehandelen", ["Zaag volgens zaaglijst. Laat grote platen in de vestiging voorzagen.", f"Hoeklatten: zaag op de tafelzaag eerst tong en groef van de Douglas-plank, dan 4 stroken 58 x 18 en 4 stroken 40 x 18, lang {m.CLAD_Z1-m.CLAD_Z0}. Zet per hoek de smalle kant van de 40-strook tegen de achterkant van de 58-strook, zodat een L van 58 x 58 ontstaat. Lijm met PU-lijm, schroef RVS 4 x 40 om de 250 mm, voorgeboord, en klem tot de lijm hard is. Daarna gronden en beitsen. De hoeklat ligt in hetzelfde vlak als de gevelplanken, die er stomp tegenaan komen; behandel de kopse kanten van de planken.", "Beits vóór montage, binnen en niet onder +8 °C: alle gevelplanken eerst gronden, kopse kanten met kopshoutverzegeling. Beits 2 lagen, op plekken die veel weer vangen 3; 8 uur tussen de lagen. Maak eerst een proefstuk voor de kleur.", "Laat de Elliotis Pine 48 uur acclimatiseren. Schuur de zichtzijde en lak die met TENCO Bootlak blank mat vóór montage, minstens 3 lagen; randen afronden en sealen. Sla hout droog en plat op."]),
-        ("Fundering", [f"Kies de plek: achterwand minstens 250 mm van de schutting (dakoverstek 100 mm plus goot). Zet de hartmaten van de poten uit (blad T6): {LEG_DX[0]} en {LEG_DX[1]} mm in de breedte, {LEG_DY} mm in de diepte. Elke staaf moet minstens 50 mm van een tegelvoeg uitkomen; schuif het chalet zo nodig iets op. Controleer of er geen kabels of leidingen lopen.",
-                       "Maak een mal: schroef aan een rechte lat 3 korte stukken paal op de hartmaten en bout daaraan de paalhouders. Neem de 3 tegels van de voorste rij uit en boor op de staafplek een gat Ø25 met een diamantboor.",
-                       "Graaf 300 x 300 mm, 500 mm diep onder de tegel; op klei 700 mm om opvriezen te voorkomen. Stort beton tot 10 mm onder de onderkant van de tegel. Leg de tegel in een mortelbed op het verse beton, gelijk met de tegels ernaast.",
-                       f"Druk de staven door de gaten in het verse beton en steun de lat op blokken. Bodem van de U {m.Z_POST} mm boven de hoogste tegel, waterpas en haaks. Het terras loopt af, dus aan de lage kant steekt de staaf verder uit: er moet overal minstens 90 mm staaf in het beton zitten.",
-                       f"Laat uitharden en doe de achterste rij op dezelfde manier. Koppel de tweede lat aan de eerste rij: {LEG_DY} mm hart op hart en gelijke diagonalen. Kit de gaten rond de staven dicht. Laat alles minstens een week uitharden voordat het chalet erop komt.",
-                       "Later weghalen: bouten los, staaf onder de tegel doorslijpen en de geboorde tegels vervangen. Het beton blijft onzichtbaar onder het terras."]),
-        ("Vloerframe", [f"Bouw frame A plat en controleer de diagonalen ({round(math.hypot(m.XR1-m.F0, m.YB1-m.F0))} mm). Zaag de OSB-onderplaat uit één stuk uit de rest van de dakplaat, 90 graden gedraaid, met sparingen rond de 6 poten. Seal alle randen, lak of beits de onderkant, en schroef de plaat met RVS 4 x 40 onder het frame, zonder kieren. Keer het frame om, leg PIR 70 in de vakken en tape de naden. Zaag elke poot op maat (nominaal {m.Z_LEG-m.Z_POST} mm), zodat de vloer waterpas staat op 5 mm afschot naar voren na. Behandel de zaagvlakken.", "Bout elke poot met 2 RVS bouten M10 door de U en vul de 3 mm speling op met ringen. Zet het frame trekvast op de poten met hoekankers en constructieschroeven.", "Dicht de sparingen rond de poten af, zodat er geen kier voor muizen overblijft. Lijm en schroef de vloerplaat met RVS 4 x 40. Verzegel alle randen."]),
-        ("Benedenwanden", ["Bouw wanden C, D, E, F plat op de vloer, met PIR 70 in de vakken van C, D en F, en tape de naden. E blijft zonder PIR. Zaag de doorgang van 190 x 260 uit de 2 platen van wand E, elk uit één stuk, en rond de randen af. Monteer eerst de achterwand met de binnenplaat over de volle breedte, ook beneden uit één stuk, en zet de zijwanden en wand E daar tegenaan: zo heeft de plaat in de hoeken houvast. Zet alles waterpas. Plaats de stijlen van wand B met hoekankers op de vloer.", "Lijm en schroef de wandplaten met RVS 3,5 x 25: voorboren, om de 100 mm, minstens 15 mm uit de rand. Dit maakt het geheel stijf; controleer de haaksheid vóór de lijm uithardt.", f"Zaag de trapbomen: teken de tanden af volgens detail 6 ({round(m.RISE)} x {round(m.RISE)} mm), boor in elke binnenhoek een gat Ø6 tegen scheuren en zaag daarnaartoe, niet erlangs. Er blijft ca. 60 mm hout over, dus zaag niet dieper dan de lijn. Schuur alles glad. Lijm eerst de versterkingsstrook (580 x 30, uit de rest) met PU-lijm op de binnenkant van de rechterboom, langs de rechte onderkant en met schuine uiteinden. Klem en schroef om de 10-15 cm met RVS 3,5 x 20, of kort langere schroeven in: er mag geen punt uitsteken waar de kat langsloopt. Lijm daarna de treden met PU-lijm op de tanden en zet ze vast met RVS 3,5 x 25, voorgeboord, midden in de boomrand. Schroef de linkerboom ook in de wandstijlen. Monteer de trap N tegen de linkerwand en proefpas: die is hierna niet meer uit te nemen."]),
-        ("Tussenvloer", ["Maak de cassette G: randen, balken, opvulstrook langs het trapgat (44 x 69 op 25 mm breed rifen), raveel, PIR 70 tussen de balken, onderplaat. Schuur de PIR zo nodig 1 mm vlak. Tape PIR-naden met alu-tape.", "Hef de cassette met twee personen op de benedenwanden. Schroef hem vast en veranker de raamstijlen boven en onder."]),
-        ("Bovenwanden", ["Bouw I, J, K met PIR tussen de regels. Tape alle naden. Monteer ze op de vloer. Plaats de twee hoekstijlen van wand H met hoekankers: meer zit er niet in de voorwand.", "Monteer de binnenplaten. Kit de naden en dicht de plaat rond de ventilatiebuis."]),
-        ("Plafond en dak", ["Maak de plafondcassette L en schroef die op de wanden. PIR bovenop de plaat.", "Zaag de 5 sporen schuin en schroef ze op de balken. Schroef de OSB-plaat met RVS 4 x 40 op de sporen, met de lange kant dwars erop; rond de hoeken af. Houd de plaat droog tot de EPDM erop zit.", "Lijm de EPDM met Premiumfol Bonding Adhesive volgens de handleiding, bij droog weer boven 5 °C. Dit is contactlijm: smeer plaat en EPDM allebei in, laat afdampen en leg het in één keer goed; op zuigende OSB eerst testen of primer nodig is. Werk de naden af met Adhesive & Sealant. Bevestig boeiboorden, gootje en afvoer.", "Bevestig de daktrim: 11 mm OSB geeft schroeven te weinig houvast, en de wind trekt aan de dakrand. Laat elke schroef doorlopen in het boeiboord. Lukt dat niet, schroef dan een stuk spouwlat onder de dakrand en schroef daarin.", "<b>Het casco is nu regendicht.</b> Laat het droog nakijken voordat je verdergaat."]),
-        ("Folie en spouw", ["Breng de folie aan op alle gevels rond het casco, met minstens 100 mm overlap en boven over onder. Neem de folie mee in de sparingen.", "Spouwlatten volgens bladen T2 en T3, met RVS 4 x 40 om de 300 mm. Een lat mag uit meerdere stukken bestaan: 10 latten van 2500 zijn genoeg (samen 20,3 m nodig). Leg elke naad op hout, met minstens 2 schroeven per stuk, geen stukken korter dan 300 mm, en verdeel de naden over de hoogte. Behandel de zaagvlakken. Op de achterwand beneden staan de latten niet recht voor de stijlen: schroef daar alleen waar een regel of stijl achter de lat zit, niet in de PIR. Laat onder en boven open en dek af met stroken RVS-gaas van ca. 40 mm breed, in een L gevouwen. Draag handschoenen; geen uitstekende draadjes."]),
-        ("Ramen", ["Zaag het lekdorpelprofiel op 1070 en 600 mm en maak de randen glad. Zet de staande zijde tegen de voorkant van de band, met de bovenkant gelijk met de vloer en de schuine zijde naar buiten. Niet hoger, anders staat het kozijn scheef. Voorboor en schroef met RVS 3,5 x 25 om de 200 mm en kit de gaten. Kit ook de open kopjes dicht.", "Lijm de EPDM op de vloerplaat, over de bovenrand van de band en langs de staande zijde omlaag, tot minstens 10 mm op de schuine zijde. Laat achter een rand van 30 mm vrij, die straks achter het kozijn omhoog komt. Geen stelblokjes en geen dorpellat: het kozijn staat direct op de EPDM.", "Plaats het raam binnenstebuiten, kozijn gelijk met de gevel, waterpas en haaks, met de zijkanten gelijk met de binnenplaten. Zet het tijdelijk vast met wiggen. Vul bij elk bevestigingspunt drukvast op: wig 6 mm plus 3 mm in de zijvoeg van 9 mm, wig 6 mm in de kopvoeg van 5 mm. Meet of het kozijn recht blijft.", f"Bevestig met kozijnschroeven 7,5 x 112, Torx T30, voorgeboord, op ongeveer 55 mm van de gevel: maximaal 150 mm uit de binnenhoeken en maximaal 600 mm onderling, bij voorkeur bij de sluitpunten. Bovenraam: 2 per zijkant en 3 boven. Onderraam: 2 per zijkant en 2 boven. Niet door de onderkant: dat doorboort de EPDM. Controleer de bediening en stel het beslag zo nodig af. Verlijm de EPDM-rand tegen de achterkant van het kozijn.", "Compriband aan de buitenkant van de zijvoegen, kit in de kopvoeg, op glaslatten en naden. Vul de rest van de voeg volledig met weinig PU-vulschuim of minerale wol en laat het raam vast staan tot het schuim hard is; niet dichtkitten wat water moet afvoeren. Controleer of de vleugel vrij langs de dorpel draait. Controleer bediening en blokkeer of beveilig de kiepstand."]),
-        ("Gevel", [f"Monteer van onder naar boven, tong omhoog. De bovenste rij is een gerifte strook van {m.TOP_STRIP} mm. Hoeklatten en kader volgens blad T2. Plaats de regenluifel tussen de hoeklatten op 5 RVS consoles, op ca. 30 cm afstand, 12 mm aflopend naar voren en met de achterkant tegen de band; kit die naad. Lijm een EPDM-rest over de bovenkant, met een druiprand aan de voorkant. Laat de lekdorpel van het bovenraam erboven vrij drupen.", "Bevestig met RVS 4 x 40 op de spouwlatten; voorboren aan de plankeinden. Controleer of de vleugels vrij blijven draaien."]),
-        ("Ventilatie en elektra", [f"Boor Ø102 (op de buismaat) op x = {m.VENT['x']}, z = {m.VENT['z']}. Plaats de PVC-buis met licht afschot naar buiten en het buitenrooster met een rondje RVS-gaas erachter. Rooster binnen.", "Installateur: voeding, kast, thermostaat, voeler, verwarming, aardlektest.", "Bescherm de kabels volledig, plaats de kap en controleer de temperatuur van de kap na 2 uur vol vermogen."]),
-        ("Watertest", ["Spoel beide ramen 15 minuten met een tuinslang, van boven naar beneden, met de ramen dicht.", "Kijk daarna aan de binnenzijde van het kozijn en in de goot. Lekt het, dan eerst dat oplossen."]),
-        ("Inwerken", ["Bekleed de treden, plaats mat, mand, hygrometer. Maak alle schroefpunten aan de kat-zijde onschadelijk.", "Test 3 dagen zonder kat: temperatuur, vocht, condens, kap en roosterstand.", "Laat de kat wennen met de voeding op de veranda. Controleer de eerste weken de hygrometer, de goot en de wanden."]),
+        ("Voorbereiding", [
+            "Lees eerst de tekeningen T1-T13. Links en rechts zijn in dit hele plan gezien vanaf de voorkant, ook als je achter het chalet staat. Hoogtes zijn gemeten vanaf de bovenkant van de hoogste terrastegel onder het chalet.",
+            "Bestel eerst de ramen en meet ze (stap 2). Bestel de rest pas daarna en controleer de gemarkeerde artikelen bij Hornbach.",
+            "Elektra is 12 V uit een accu, met de controller uit de map controller. Waar accu en regelkast komen en langs welke weg de kabels de bovenkamer in gaan, is nog niet ontworpen. Leg dat vast vóór stap 8, want daarna gaan de wanden dicht.",
+            "Tot het dak in stap 10 dicht is, gaat er elke avond en bij elke bui een afdekzeil over het werk. PIR, gelakte platen en OSB mogen niet nat worden.",
+        ]),
+        ("Ramen inmeten", [
+            f"Meet beide kozijnen na ontvangst op drie plekken in breedte en hoogte, en meet ook de diepte (het plan rekent met {m.WIN_D}). Is een maat anders dan 1000 x 500 of 500 x 500, pas dan eerst het model aan: breedte, kamerhoogte en diepte van het hele chalet hangen hiervan af.",
+            "Bekijk de scharnierzijde, de glaslatten en de afwateringssleuven. Monteer de afsluitbare greep en de kiepbeveiliging. Test de kiep- en draaistand met het raam omgekeerd op de werkbank.",
+        ]),
+        ("Zagen en voorbehandelen", [
+            f"Zaag de balken en regels volgens blad T12 en schrijf op elk stuk het bouwdeel en de naam. Zaag de platen volgens blad T11, of de betonplex volgens je eigen Betonplex_zaagplan_trap.dxf. Laat grote platen in de vestiging voorzagen. Zaag alle wandplaten {PLATE_H} hoog in plaats van {m.ROOM_H}: ze komen 4 mm boven de vloer, met een kitvoeg, zodat ze geen water optrekken.",
+            f"Sparingen. Doorgang in de 2 platen van wand E: {m.CAT_Y1 - m.CAT_Y0} breed en {m.CAT_H} hoog vanaf de vloer, {CAT_B} mm uit de achterkant van de plaat. Meet vanaf de achterkant: de verandaplaat is aan de voorkant langer dan de plaat aan de trapzijde. Trapgat in de onderplaat en de vloerplaat van de tussenvloer: {HOLE} mm, {HOLE_L} mm uit de linkerrand en {HOLE_B} mm uit de achterrand. Teken elke sparing af met de plaat in de stand waarin hij straks zit. De onderplaat ligt met de gelakte kant naar beneden: teken je hem af met de lakzijde boven, dan wisselen links en rechts.",
+            f"Hoeklatten: zaag op de tafelzaag eerst tong en groef van de Douglas-plank, dan 4 stroken 58 x 18 en 4 stroken 40 x 18, lang {m.CLAD_Z1-m.CLAD_Z0}. Zet per hoek de smalle kant van de 40-strook tegen de achterkant van de 58-strook, zodat een L van 58 x 58 ontstaat. Lijm met PU-lijm, schroef RVS 4 x 40 om de 250 mm, voorgeboord, en klem tot de lijm hard is. Rif de overige stroken (boeiboorden, kader, band, voorrand, regenluifel en de bovenste gevelrij van {m.TOP_STRIP}) volgens het Excel-tabblad 'Latten op lengte'. Meet eerst een plank: is die zonder tong en groef smaller dan 145, dan klopt die indeling niet meer.",
+            "Beits alles vóór de montage, binnen en niet onder +8 °C. Gevelplanken, kader, band en voorrand krijgen eerst grondverf en dan grenen beits. Hoeklatten, boeiboorden en regenluifel krijgen antraciet, 3 lagen rondom. Beits 2 lagen, op plekken die veel weer vangen 3, met 8 uur tussen de lagen. Kopse kanten en gerifte randen krijgen kopshoutverzegeling. Maak eerst een proefstuk voor de kleur. Behandel later elke zaagsnede op de bouw na.",
+            "Laat de Elliotis Pine 48 uur acclimatiseren. Schuur de zichtzijde en lak die met TENCO Bootlak blank mat, minstens 3 lagen en 24 uur per laag. De achterkant wordt gelijmd en blijft kaal. Bij de onderplaat van de tussenvloer en de plafondplaat is de onderkant de zichtzijde. Rond de randen af en seal ze. Sla hout droog en plat op.",
+        ]),
+        ("Fundering", [
+            f"Kies de plek: achterwand minstens 250 mm van de schutting (dakoverstek 100 mm plus goot). Zet de hartmaten van de poten uit (blad T6): {LEG_DX[0]} en {LEG_DX[1]} mm in de breedte, {LEG_DY} mm in de diepte, diagonaal over de buitenste poten {LEG_DIAG} mm. Elke staaf moet minstens 50 mm van een tegelvoeg uitkomen; schuif het chalet zo nodig iets op. Controleer of er geen kabels of leidingen lopen. Bepaal met waterpas en rechte lat welke van de 6 staafplekken het hoogst ligt: dat is hoogte 0.",
+            "Maak een mal: schroef aan een rechte lat 3 korte stukken paal (uit de rest van de paal) op de hartmaten en bout daaraan de paalhouders. Neem de tegels van de voorste rij uit en boor op elke staafplek een gat Ø25 met een diamantboor.",
+            "Graaf 300 x 300 mm, 500 mm diep onder de tegel; op klei 700 mm om opvriezen te voorkomen. Stort beton tot 10 mm onder de onderkant van de tegel. Leg de tegel in een mortelbed op het verse beton, gelijk met de tegels ernaast.",
+            f"Druk de staven door de gaten in het verse beton en steun de lat op blokken. De bodem van elke U komt {m.Z_POST} mm boven hoogte 0, alle U's even hoog, waterpas en haaks. Het terras loopt af, dus aan de lage kant steekt de staaf verder uit: er moet overal minstens 90 mm staaf in het beton zitten.",
+            f"Laat uitharden en doe de achterste rij op dezelfde manier. Koppel de tweede lat aan de eerste rij: {LEG_DY} mm hart op hart en gelijke diagonalen. Kit de gaten rond de staven dicht. Laat alles minstens een week uitharden voordat het chalet erop komt. In die week kun je de frames uit stap 5 tot en met 9 al bouwen.",
+            "Later weghalen: bouten los, staaf onder de tegel doorslijpen en de geboorde tegels vervangen. Het beton blijft onzichtbaar onder het terras.",
+        ]),
+        ("Vloerframe", [
+            f"Bouw frame A plat: de langsbalken voor en achter ({m.XR1 - m.F0}) over de koppen van de {len(m.FLOOR_X)} dwarsbalken ({BALK}), met 2 constructieschroeven 5 x 80 per verbinding, voorgeboord. Controleer de diagonalen ({FR_DIAG} mm). Schroef de OSB-onderplaat met RVS 4 x 40 onder het frame, zonder kieren. De plaat komt uit één stuk uit de rest van de dakplaat, met uitsparingen van 68 x 68 rond de 6 poten. Seal alle randen en lak of beits de onderkant. Keer het frame om, leg PIR 70 in de vakken en tape de naden.",
+            f"Poten: zaag de achterste 3 op {m.Z_LEG - m.Z_POST} mm en de voorste 3 op {m.Z_LEG - m.Z_POST - 5} mm. Zo krijgt de vloer 5 mm afschot naar voren, als de U's even hoog staan; meet dat per poot na. Behandel de zaagvlakken. Zet de poten in de U's, boor door de gaten van de U heen en bout elke poot met 2 RVS-bouten M10. Vul de speling van 3 mm op met ringen.",
+            "Zet het frame op de poten: in de breedte waterpas, in de diepte 5 mm aflopend naar voren. Het hele chalet helt daardoor iets naar voren, dus zet wanden en ramen haaks op de vloer en niet op de waterpas in de diepte. Zet elke poot trekvast aan het frame met een hoekanker en constructieschroeven. Dicht de uitsparingen rond de poten af, zodat er geen kier voor muizen overblijft. Lijm en schroef de vloerplaat met RVS 4 x 40 en verzegel alle randen.",
+        ]),
+        ("Benedenwanden en trap", [
+            f"Bouw de frames C, D, E en F volgens blad T8: de regels over de koppen van de stijlen, 2 schroeven 5 x 80 per verbinding, voorgeboord. Lijm en schroef de binnenplaat erop, met de gelakte kant naar de kamer en de onderrand 4 mm boven de onderkant van het frame. Gebruik RVS 3,5 x 25, voorgeboord, om de 100 mm en minstens 15 mm uit de rand. De plaat maakt het frame haaks, dus controleer de diagonalen voordat de lijm uithardt. Bij D en aan de trapzijde van E steekt de plaat 13 mm voor het frame uit, tot tegen het kozijn. In de open veranda lopen de platen door tot 18 mm achter de voorkant, tegen de kaderstijl en de afdekking van de wandkop: bij F 22 mm voorbij het frame, aan de verandazijde van E 66 mm. Zet die laatste plaat pas vast als raamstijl B staat, en schroef de voorrand in de raamstijl. Leg nog geen PIR in de wanden.",
+            f"Zet C op de vloer, gelijk met de achterrand, en schroef de onderregel om de 300 mm met 5 x 80 door de vloerplaat in het frame. Zet D en F gelijk met de zijkanten en E met het regelwerk op {E_X} mm uit de linkerrand van de vloer. F loopt door tot de voorrand; D en E beginnen 44 mm erachter, want daar komen de raamstijlen. Tussen de raamstijlen links en rechts komt straks het onderraam, met 1 mm speling per kant; meet dat na aan het echte raam. Schroef ze op de vloer en schroef vanuit het open vak 3 schroeven 5 x 80 door de achterste stijl en de achterplaat in de achterwand.",
+            "Raamstijlen B: de 44 x 69 links voor, tegen de voorste stijl van D, en de 44 x 69 voor wand E. Zet ze nu alleen voorlopig vast, met één schroef schuin in de vloer. Ze dragen straks de cassette, maar de definitieve bevestiging volgt pas in stap 11, strak tegen het kozijn.",
+            f"Trap. Zaag de trapbomen: teken de tanden af volgens detail 6 ({round(m.RISE)} x {round(m.RISE)} mm), boor in elke binnenhoek een gat Ø6 tegen scheuren en zaag daarnaartoe, niet erlangs. Er blijft ca. 60 mm hout over, dus zaag niet dieper dan de lijn. Schuur alles glad. Lijm de versterkingsstrook (580 x 30) met PU-lijm op de binnenkant van de rechterboom, langs de rechte onderkant en met schuine uiteinden. Klem hem en schroef om de 10-15 cm met RVS 3,5 x 20; er mag geen punt uitsteken. Bekleed de treden nu met sisal of rubber, want later kom je er slecht bij. Lijm de treden met PU-lijm op de tanden en zet ze vast met RVS 3,5 x 25, voorgeboord, midden in de boomrand.",
+            f"Zet de trap tegen de linkerwand, met de voet {m.ST_Y0 - m.F0} mm achter de voorrand van de vloer (5 mm achter het kozijn) en de bovenkant tegen de achterwand. Schroef de linkerboom met RVS 4 x 40 door de plaat in de stijlen van D en zet de voet van beide bomen schuin vast in de vloer. Maak schroefpunten aan de katkant nu onschadelijk. Na de tussenvloer is de trap niet meer uit te nemen.",
+        ]),
+        ("Tussenvloer", [
+            f"Bouw cassette G volgens blad T6: de randen voor en achter over de koppen van de balken ({BALK}), 2 schroeven 5 x 80 per verbinding. Schroef de opvulstrook (44 x 69, op 25 mm gerift) tegen de linkerbalk en zet de raveelbalk tussen de opvulstrook en de balk rechts van het trapgat. Leg het frame ondersteboven. Lijm en schroef de onderplaat erop, met de gelakte kant naar beneden en het trapgat op zijn plek. Lijm de dagkanten (Elliotis, 69 hoog) langs de linker- en achterkant van het trapgat.",
+            "Zet de cassette, nog zonder vloerplaat, met twee personen op de benedenwanden, rondom gelijk met de buitenkant. Schroef vanuit de open wandvakken om de 300 mm met 5 x 80 omhoog, door de bovenregels en de onderplaat in de randen en balken.",
+            "Leg PIR 70 tussen de balken; achter het trapgat komt een strook van 25 mm. Schuur de PIR zo nodig 1 mm vlak en tape de naden met alu-tape. Lijm en schroef de vloerplaat (betonplex, trapgat uitgezaagd) met RVS 4 x 40. Zet daarna de PIR in de benedenwanden C, D, E en F en tape de naden. In E gaat ook een stuk boven de latei van de doorgang.",
+        ]),
+        ("Bovenwanden en kabels", [
+            f"Bouw de frames I, J en K volgens blad T9, met de platen zoals beneden. Zaag in de achterplaat van I het gat voor de ventilatiebuis (Ø102, op de buismaat): hart {VENT_R} mm uit de rechterrand, gezien vanuit de kamer, en {VENT_Z} mm boven de vloer. Zet een extra regel of klos in wand K waar de beschermkap en de verwarmer komen: die horen in hout, niet in de 9 mm plaat.",
+            "Zet I, J en K op de cassette zoals de benedenwanden: I eerst, J en K ertegen, en verbind ze vanuit de vakken. Schroef de onderregels met 5 x 80 door de vloerplaat in de cassette. Zet de twee hoekstijlen van wand H voor J en K, net als de raamstijlen B voorlopig met één schroef. Meer zit er niet in de voorwand: het raam komt ertussen.",
+            "Kabels, vóór de PIR erin gaat: leg een mantelbuis van de bovenkamer naar buiten, langs de route uit stap 1, voor de mat, de verwarmer, de ventilator en de voelers. Geen kabel in het bereik van de kat. Laat er een trekdraad in zitten.",
+        ]),
+        ("Plafond en dak", [
+            f"Bouw de plafondcassette L zoals de tussenvloer, met de plafondplaat met de gelakte kant naar beneden. Zet hem op de bovenwanden en schroef vanuit de wandvakken omhoog. Boven het raam rust de rand voor alleen op de hoekstijlen; tussen rand en kozijn blijft {m.WIN_JOINT} mm. Leg PIR in de wanden I, J en K en tussen de plafondbalken, en tape alle naden. Snijd in wand I de PIR uit rond het gat voor de ventilatiebuis.",
+            f"Zaag {len(m.CEIL_X)} sporen en 2 zijsporen op {m.RAFT_L} mm en schuin, van {m.RAFT_H0} voor naar {m.RAFT_H1} achter (blad T7). Schroef de sporen recht boven de plafondbalken, {OV_F} mm voor en {OV_B} mm achter het regelwerk uit. Zet de zijsporen {OV_S} mm buiten de zijkant van het regelwerk, met per kant 3 rijklossen van {KLOS} mm naar de buitenste spoor: boven de voorwand, in het midden en boven de achterwand. De bovenkant van elke klos loopt schuin mee met de sporen. Boor in elke klos een gat Ø16 zodat er lucht langs kan.",
+            f"Boeiboorden: voor en achter ({m.ROOF_W - 36}) tegen de koppen van sporen en zijsporen, 2 schroeven 5 x 80 per spoor. Daarna links en rechts ({m.ROOF_L}) over de zijsporen en de koppen van voor en achter. De bovenkant komt {m.OSB_T} mm boven de sporen, gelijk met de dakplaat, en de onderkant 33 mm onder de sporen.",
+            f"Leg de dakplaat ({m.ROOF_W - 36} x {m.RAFT_L}) tussen de boeiboorden, met de lange kant dwars op de sporen. Schroef hem met RVS 4 x 40 om de 150 mm in sporen en zijsporen en rond de hoeken af. Houd de plaat droog tot de EPDM erop zit.",
+            f"Snij de EPDM (1520 x 1300) eerst op maat: 1520 over de breedte en in de diepte {m.ROOF_L} plus 30 mm voor en achter. Links en rechts snij je de overmaat af tot 30 mm. Zo valt er rondom 30 mm over de boeiboorden, net onder de trim van 28 mm. De rest, een strook van ca. 1520 x {1300 - m.ROOF_L - 60}, bewaar je voor het bovenraam. Lijm de EPDM met Coverbond contactlijm volgens het blik, bij droog weer boven 5 °C: smeer plaat en EPDM allebei in, laat afdampen en leg het in één keer goed. Test eerst op zuigende OSB of primer nodig is. Werk naden en randen af met EPDM-kit. Daktrim (Brute 35 x 28): zaag de 2 lengtes op {m.ROOF_W} en {m.ROOF_L} met de hoeken in verstek; meet eerst, want het is krap. Schroef met RVS 4,5 x 35 om de ca. 200 mm: bij de sporen en zijsporen door de plaat in het spoor, daartussen in de bovenkant van het boeiboord. Alleen in 11 mm OSB houdt de schroef niet. Hang het gootje met afschot aan het achterste boeiboord, met de afvoer weg van de schutting.",
+            "<b>Het casco is nu regendicht.</b> Laat het droog nakijken voordat je verdergaat.",
+        ]),
+        ("Folie en spouw", [
+            "Breng de folie aan op alle gevels rond het casco, met minstens 100 mm overlap en boven over onder. Vouw de folie in de raamopeningen om tot op de stijlen en plak hem vast met folietape.",
+            "Ventilatiebuis: steek de PVC-buis door de achterplaat en de PIR naar buiten, met licht afschot naar buiten, zo lang dat hij straks gelijk komt met de buitenkant van de gevelplanken. Plak de folie rond de buis af met folietape.",
+            "Spouwlatten volgens bladen T2 en T3, met RVS 4 x 40 om de 300 mm. Een lat mag uit meerdere stukken bestaan: 10 latten van 2500 zijn genoeg (samen 20,3 m nodig). Leg elke naad op hout, met minstens 2 schroeven per stuk, geen stukken korter dan 300 mm, en verdeel de naden over de hoogte. Behandel de zaagvlakken. Op de achterwand beneden staan de latten niet recht voor de stijlen: schroef daar alleen waar een regel of stijl achter de lat zit, niet in de PIR.",
+            "Voorkant: de latten onder beide ramen (band tussenvloer en voorrand vloer) komen met de bovenkant precies gelijk met de vloer, want het kozijn steunt erop. Onderbreek de lat boven het bovenraam in het midden over 10 mm voor de ventilatie. Laat de spouw onder en boven open en dek af met stroken RVS-gaas van ca. 40 mm breed, in een L gevouwen. Draag handschoenen; er mogen geen draadjes uitsteken.",
+        ]),
+        ("Ramen", [
+            "Schroef eerst de band tussenvloer (90 hoog) en de voorrand vloer (114 hoog) met RVS 4 x 40 op de latten, met de bovenkant gelijk met de vloer erachter. Laat links en rechts 58 mm vrij voor de hoeklatten.",
+            "Zaag het lekdorpelprofiel op 1070 en 600 mm, zodat het 35 mm (boven) en 50 mm (beneden) voorbij elke kant van het kozijn steekt, en maak de randen glad. Zet de staande zijde tegen de voorkant van de band of voorrand, met de bovenkant gelijk met de vloer en de schuine zijde naar buiten. Niet hoger, anders staat het kozijn scheef. Voorboor en schroef met RVS 3,5 x 25 om de 200 mm en kit de gaten. Kit ook de open kopjes dicht.",
+            "Lijm de EPDM op de vloerplaat, over de bovenrand van de band en langs de staande zijde omlaag, tot minstens 10 mm op de schuine zijde. Laat achter een rand van 30 mm vrij, die straks achter het kozijn omhoog komt. Geen stelblokjes en geen dorpellat: het kozijn staat direct op de EPDM.",
+            f"Plaats het raam binnenstebuiten, kozijn gelijk met de gevel, waterpas en haaks op de vloer. Schuif de stijlen links en rechts er strak tegenaan, met {m.WIN_GAP} mm speling per kant: gebruik een plaatje van {m.WIN_GAP} mm als maat en haal het daarna weg. Zet de stijlen nu definitief vast: onder en boven een hoekanker, en 2 schroeven 5 x 80 in de wandstijl erachter. Kies rechte stijlen, want een kromme stijl trekt het kozijn mee. In de kopvoeg van {m.WIN_JOINT} mm komt bij elk bevestigingspunt boven een wig van 6 mm. Meet of het kozijn recht blijft.",
+            "Bevestig met kozijnschroeven 7,5 x 112, Torx T30, voorgeboord, op ongeveer 55 mm van de gevel: maximaal 150 mm uit de binnenhoeken en maximaal 600 mm onderling, bij voorkeur bij de sluitpunten. Bovenraam: 2 per zijkant in de hoekstijlen en 3 boven. Onderraam: 2 per zijkant in de raamstijlen en 2 boven. Niet door de onderkant: dat doorboort de EPDM. Controleer de bediening en stel het beslag zo nodig af. Verlijm de EPDM-rand tegen de achterkant van het kozijn.",
+            "Kit de zijvoegen tussen kozijn en stijl aan de buitenkant af, en kit ook de kopvoeg, de glaslatten en de naden. Vul de kopvoeg achter de kit met weinig PU-vulschuim of minerale wol en laat het raam vast staan tot het schuim hard is. Kit niet dicht wat water moet afvoeren. Controleer of de vleugel vrij langs de dorpel draait, controleer de bediening en blokkeer of beveilig de kiepstand.",
+            "Watertest, nu het nog open is: spoel beide ramen 15 minuten met een tuinslang van boven naar beneden, met de ramen dicht. Kijk aan de binnenzijde van het kozijn en onder de dorpel. Lekt het, los dat eerst op.",
+        ]),
+        ("Gevel", [
+            "Monteer de hoeklatten op de hoeken (blad T2), met RVS 4 x 40 in de spouwlatten.",
+            f"Gevelplanken van onder naar boven, tong omhoog, stomp tegen de hoeklatten. De onderste plank komt 33 mm onder de onderkant van het vloerframe en loopt evenwijdig aan het frame. De bovenste rij is de gerifte strook van {m.TOP_STRIP} mm. Schroef met RVS 4 x 40 in de spouwlatten en boor voor aan de plankeinden. Zaag de planken achter rond de ventilatiebuis uit.",
+            "Voorkant: de kaderstijlen naast de ramen, het kader boven het bovenraam en de afdekking van de open wandkop van de veranda (blad T2). Plaats de regenluifel tussen de hoeklatten op 5 RVS-consoles, op ca. 30 cm afstand, 12 mm aflopend naar voren en met de achterkant tegen de band; kit die naad. Lijm een EPDM-rest over de bovenkant, met een druiprand aan de voorkant. Laat de lekdorpel van het bovenraam erboven vrij drupen. Controleer of de vleugels vrij blijven draaien.",
+            "Schroef de onderplaten van het overstek (betonplex) onder de sporen, zijsporen en rijklossen. Houd 15 mm spleet tot de gevel en leg daar RVS-gaas in: hier ventileren spouw en dak.",
+        ]),
+        ("Ventilatie en elektra", [
+            "Ventilatie: kit de buis rondom aan de gevel. Buitenrooster met een rondje RVS-gaas erachter, binnen het afsluitbare rooster.",
+            "Elektra (12 V): mat, verwarmer achter de stalen kap, ventilator en voelers volgens controller/LEESMIJ.md. De kamervoeler komt op ongeveer 300 mm hoogte, niet bij de verwarmer. Bevestig kap en verwarmer in de regels en zet er een niet-brandbare plaat achter. Controleer na 2 uur vol vermogen de temperatuur van de kap.",
+        ]),
+        ("Inwerken", [
+            "Laat het chalet luchten tot je de lak niet meer ruikt. Leg mat en mand, hang de hygrometer op en controleer alle schroefpunten aan de katkant.",
+            "Test 3 dagen zonder kat: temperatuur, vocht, condens, de kap en de stand van het rooster.",
+            "Laat de kat wennen met de voeding op de veranda. Controleer de eerste weken de hygrometer, de goot en de wanden, en na elke harde bui de binnenzijde van de kozijnen.",
+        ]),
     ]
     for i, (t, ss) in enumerate(steps, 1):
         Bd.append(KeepTogether([P(f"{i}. {t}", "h2")] + [B(s) for s in ss]))

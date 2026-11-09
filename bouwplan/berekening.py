@@ -55,7 +55,7 @@ def heat():
     a_side_pir = pir_area("J", "PIR wand", (2, 4))
     a_back = iw * ih
     a_back_pir = pir_area("I", "PIR wand", (0, 4))
-    a_front = iw * ih - m.WIN_U_W * m.WIN_H / 1e6
+    a_front = max(iw * ih - m.WIN_U_W * m.WIN_H / 1e6, 0)   # raam is breder dan de kamer: geen voorwand binnen
     hole = (m.HOLE_X1 - m.HOLE_X0) * (m.HOLE_Y1 - m.HOLE_Y0) / 1e6
     a_floor = iw * id_ - hole
     a_floor_pir = sum((p.box[1] - p.box[0]) * (p.box[3] - p.box[2]) for p in m.parts if p.name == "PIR tussenvloer") / 1e6

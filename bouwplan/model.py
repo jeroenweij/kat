@@ -26,7 +26,9 @@ ROOM_H = WIN_H + WIN_JOINT    # 505: kozijn op de vloer, voeg eronder tegen het 
 F0 = CLAD + BAT               # 40: buitenkant regelwerk
 F1 = F0 + S                   # 84: binnenkant regelwerk voorwand en eerste balk
 XL1 = F0 + J                  # 109: binnenkant linkerwand, regelwerk 44x69
-W = WIN_U_W + 2 * (XL1 + PLY) # 1236: raam past precies tussen de binnenplaten
+WIN_GAP = 1                   # speling per kant tussen kozijn en stijl: stijlen strak tegen het kozijn, 2 mm totaal
+W = WIN_U_W + 2 * (XL1 + WIN_GAP)   # 1220: kozijn tussen de stijlen; binnenplaten steken 8 mm voorbij het kozijn
+WIN_X0 = XL1 + WIN_GAP        # 110: linkerkant van beide kozijnen
 IN_Y0 = WIN_D                 # 71: de achterkant van het kozijn is de voorkant van de kamer
 IN_Y1 = IN_Y0 + IN_DEPTH      # 671
 YB0 = IN_Y1 + PLY             # 680: achterwand regelwerk
@@ -34,6 +36,7 @@ YB1 = YB0 + J                 # 749
 D = YB1 + F0                  # 789: buitenmaat gevelbekleding
 XR0, XR1 = W - XL1, W - F0    # 1127, 1196: rechterwand regelwerk
 XB = XR1 - S                  # 1152: laatste balk of stijl, gelijk met de buitenkant
+YR = YB1 - S                  # 705: achterbalk vloer, tussenvloer en plafond 44 x 69 aan de buitenkant; balken lopen tot hier
 
 Z_POST = 30                   # hoogste tegel -> bodem U-paalhouder, onderkant poot
 Z_LEG = 180                   # hoogste tegel van het terras -> onderkant vloerframe
@@ -60,9 +63,10 @@ TOP_STRIP = CLAD_Z1 - CLAD_Z0 - N_BOARD * BOARD   # 65
 
 # binnenvlakken
 IN_X0, IN_X1 = XL1 + PLY, XR0 - PLY        # bovenkamer links/rechts
-ROOM_X1 = IN_X0 + WIN_L_W     # 618: rechterkant trapkamer, gelijk met het lage raam
-PART_X0, PART_X1 = ROOM_X1 + PLY, ROOM_X1 + PLY + S   # scheidingswand: regelwerk
-VER_X0 = PART_X1 + PLY        # 680: linkerkant veranda
+PART_X0 = WIN_X0 + WIN_L_W + WIN_GAP   # 611: scheidingswand en raamstijl strak naast het lage raam
+PART_X1 = PART_X0 + J         # scheidingswand 44 x 69 met PIR
+ROOM_X1 = PART_X0 - PLY       # 602: rechterkant trapkamer (binnenplaat)
+VER_X0 = PART_X1 + PLY        # 689: linkerkant veranda
 ST_X1 = HOLE_X1 = IN_X0 + 247 # 365: rechterkant trap en trapgat
 
 # trap, hier al nodig omdat de maat van het trapgat eruit volgt
@@ -143,11 +147,11 @@ for lx in LEG_X:
     for ly in LEG_Y:
         add("Poot", g, "P69", lx[0], lx[1], ly[0], ly[1], Z_POST, Z_LEG)
 add("Langsbalk voor", g, "I69", F0, XR1, F0, F1, Z_LEG, Z_DECK0)
-add("Langsbalk achter", g, "I69", F0, XR1, YB0, YB1, Z_LEG, Z_DECK0)
+add("Langsbalk achter", g, "I69", F0, XR1, YR, YB1, Z_LEG, Z_DECK0)
 for x in FLOOR_X:
-    add("Dwarsbalk", g, "I69", x, x + S, F1, YB0, Z_LEG, Z_DECK0)
+    add("Dwarsbalk", g, "I69", x, x + S, F1, YR, Z_LEG, Z_DECK0)
 for a, b in zip(FLOOR_X, FLOOR_X[1:]):
-    add_pir("PIR vloer", g, a + S, b, F1, YB0, Z_LEG, Z_DECK0)
+    add_pir("PIR vloer", g, a + S, b, F1, YR, Z_LEG, Z_DECK0)
 add("Vloerplaat beneden", g, "BP12", F0, XR1, F0, YB1, Z_DECK0, Z_DECK)
 # onderplaat: restant OSB uit een stuk, uitgespaard rond de poten
 za, zb = Z_LEG - OSB_T, Z_LEG
@@ -181,7 +185,7 @@ def wall_x(group, ya, yb, zb, studs):
 
 g = "B Voorwand beneden"
 add("Raamstijl", g, "B69", F0, XL1, F0, F1, Z0, Z1, note="geen regels: kozijn direct op de vloer")
-add("Raamstijl", g, "R44", PART_X0, PART_X1, F0, F1, Z0, Z1, note="geen regels: kozijn direct op de vloer")
+add("Raamstijl", g, "B69", PART_X0, PART_X1, F0, F1, Z0, Z1, note="geen regels: kozijn direct op de vloer")
 
 g = "C Achterwand beneden"
 wall_x(g, YB0, YB1, Z0, FLOOR_X)
@@ -199,14 +203,19 @@ g = "E Scheidingswand"
 CAT_H = 260
 CAT_Y1 = IN_Y1 - S            # 627
 CAT_Y0 = CAT_Y1 - 190         # 437
-add("Onderregel voorste deel", g, "R44", PART_X0, PART_X1, F1, CAT_Y0, Z0, Z0 + S)
-add("Onderregel achterste deel", g, "R44", PART_X0, PART_X1, CAT_Y1, IN_Y1, Z0, Z0 + S)
-add("Bovenregel", g, "R44", PART_X0, PART_X1, F1, IN_Y1, Z1 - S, Z1)
+add("Onderregel voorste deel", g, "B69", PART_X0, PART_X1, F1, CAT_Y0, Z0, Z0 + S)
+add("Onderregel achterste deel", g, "B69", PART_X0, PART_X1, CAT_Y1, IN_Y1, Z0, Z0 + S)
+add("Bovenregel", g, "B69", PART_X0, PART_X1, F1, IN_Y1, Z1 - S, Z1)
 for y in (F1, mid(F1, CAT_Y0 - S), CAT_Y0 - S, CAT_Y1):
-    add("Stijl", g, "R44", PART_X0, PART_X1, y, y + S, Z0 + S, Z1 - S)
-add("Latei kattenopening", g, "R44", PART_X0, PART_X1, CAT_Y0, CAT_Y1, Z0 + CAT_H, Z0 + CAT_H + S)
-for lbl, xa in (("trapzijde", ROOM_X1), ("verandazijde", PART_X1)):
-    add(f"Plaat {lbl}", g, "LP9", xa, xa + PLY, IN_Y0, CAT_Y0, Z0, Z1, cut=(IN_Y1 - IN_Y0, ROOM_H, PLY),
+    add("Stijl", g, "B69", PART_X0, PART_X1, y, y + S, Z0 + S, Z1 - S)
+add("Latei kattenopening", g, "B69", PART_X0, PART_X1, CAT_Y0, CAT_Y1, Z0 + CAT_H, Z0 + CAT_H + S)
+E_STUD = (F1, mid(F1, CAT_Y0 - S), CAT_Y0 - S)
+for a, b in zip(E_STUD, E_STUD[1:]):
+    add_pir("PIR wand", g, PART_X0, PART_X1, a + S, b, Z0 + S, Z1 - S)
+add_pir("PIR boven doorgang", g, PART_X0, PART_X1, CAT_Y0, CAT_Y1, Z0 + CAT_H + S, Z1 - S)
+for lbl, xa, ya in (("trapzijde", ROOM_X1, IN_Y0), ("verandazijde", PART_X1, CLAD)):
+    # trapzijde stopt tegen het kozijn; in de open veranda loopt de plaat door tot achter de kaderstijl
+    add(f"Plaat {lbl}", g, "LP9", xa, xa + PLY, ya, CAT_Y0, Z0, Z1, cut=(IN_Y1 - ya, ROOM_H, PLY),
         note=f"uit een stuk; doorgang {CAT_Y1 - CAT_Y0}x{CAT_H} uitzagen, randen afronden")
     add(f"Plaat {lbl}", g, "LP9", xa, xa + PLY, CAT_Y1, IN_Y1, Z0, Z1, count=False)
     add(f"Plaat {lbl}", g, "LP9", xa, xa + PLY, CAT_Y0, CAT_Y1, Z0 + CAT_H, Z1, count=False)
@@ -215,7 +224,7 @@ g = "F Rechterwand beneden"
 wall_y(g, XR0, XR1, F0, IN_Y1, Z0, (F0,) + SIDE_Y)
 for a, b in zip(SIDE_Y, SIDE_Y[1:]):
     add_pir("PIR wand", g, XR0, XR1, a + S, b, Z0 + S, Z1 - S)
-add("Binnenplaat", g, "LP9", IN_X1, XR0, F0, IN_Y1, Z0, Z1, note="dicht tot aan de voorzijde")
+add("Binnenplaat", g, "LP9", IN_X1, XR0, CLAD, IN_Y1, Z0, Z1, note="loopt door tot achter de afdekking wandkop")
 
 # --- Tussenvloer ------------------------------------------------------------
 g = "G Tussenvloer"
@@ -235,22 +244,23 @@ add("Onderplaat tussenvloer", g, "LP9", F0, HOLE_X0, HOLE_Y0, YB1, z0, z1, count
 add("Onderplaat tussenvloer", g, "LP9", HOLE_X1, XR1, HOLE_Y0, YB1, z0, z1, count=False)
 add("Onderplaat tussenvloer", g, "LP9", HOLE_X0, HOLE_X1, HOLE_Y1, YB1, z0, z1, count=False)
 add("Rand voor", g, "B69", F0, XR1, F0, F1, Z_MID_J, Z_MID_T)
-add("Rand achter", g, "B69", F0, XR1, YB0, YB1, Z_MID_J, Z_MID_T)
+add("Rand achter", g, "B69", F0, XR1, YR, YB1, Z_MID_J, Z_MID_T)
 for x in MID_X:
-    add("Balk", g, "B69", x, x + S, F1, YB0, Z_MID_J, Z_MID_T)
-add("Opvulstrook trapgat", g, "B69", F1, XL1, F1, YB0, Z_MID_J, Z_MID_T, note="44x69 rifen: steunt de plaat tot aan het trapgat")
+    add("Balk", g, "B69", x, x + S, F1, YR, Z_MID_J, Z_MID_T)
+add("Opvulstrook trapgat", g, "B69", F1, XL1, F1, YR, Z_MID_J, Z_MID_T, note="44x69 rifen: steunt de plaat tot aan het trapgat")
 add("Raveelbalk trapgat", g, "B69", XL1, HOLE_X1, HOLE_Y0 - S, HOLE_Y0, Z_MID_J, Z_MID_T)
 add("Dagkant trapgat links", g, "LP9", XL1, IN_X0, HOLE_Y0, IN_Y1, Z_MID_J, Z_MID_T)
 add("Dagkant trapgat achter", g, "LP9", HOLE_X0, HOLE_X1, IN_Y1, YB0, Z_MID_J, Z_MID_T)
 add_pir("PIR tussenvloer", g, XL1, HOLE_X1, F1, HOLE_Y0 - S, Z_MID_T - PIR, Z_MID_T)
 for xa, xb in ((HOLE_X1 + S, PART_X0), (PART_X0 + S, MID_X[3]), (MID_X[3] + S, XB)):
-    add_pir("PIR tussenvloer", g, xa, xb, F1, YB0, Z_MID_T - PIR, Z_MID_T)
+    add_pir("PIR tussenvloer", g, xa, xb, F1, YR, Z_MID_T - PIR, Z_MID_T)
+add_pir("PIR achter trapgat", g, XL1, HOLE_X1, YB0, YR, Z_MID_T - PIR, Z_MID_T)
 
 # --- Bovenverdieping --------------------------------------------------------
 Z0, Z1 = Z_UP, Z_U_TOP
 g = "H Voorwand boven"
 for x in (F0, XR0):
-    add("Hoekstijl", g, "B69", x, x + J, F0, F1, Z0, Z1, note="kozijn past hiertussen, 9 mm voeg per kant")
+    add("Hoekstijl", g, "B69", x, x + J, F0, F1, Z0, Z1, note="strak tegen het kozijn, 1 mm speling per kant")
 
 g = "I Achterwand boven"
 wall_x(g, YB0, YB1, Z0, BACK_U)
@@ -269,19 +279,34 @@ for g, xa, xb, plya, plyb in (("J Linkerwand boven", F0, XL1, XL1, IN_X0),
 g = "L Plafond"
 add("Plafondplaat", g, "LP9", F0, XR1, F0, YB1, Z_U_TOP, Z_CEIL_J)
 add("Rand voor", g, "B69", F0, XR1, F0, F1, Z_CEIL_J, Z_RAFT)
-add("Rand achter", g, "B69", F0, XR1, YB0, YB1, Z_CEIL_J, Z_RAFT)
+add("Rand achter", g, "B69", F0, XR1, YR, YB1, Z_CEIL_J, Z_RAFT)
 CEIL_X = BACK_U
 for x in CEIL_X:
-    add("Balk", g, "B69", x, x + S, F1, YB0, Z_CEIL_J, Z_RAFT)
+    add("Balk", g, "B69", x, x + S, F1, YR, Z_CEIL_J, Z_RAFT)
 for a, b in zip(CEIL_X, CEIL_X[1:]):
-    add_pir("PIR plafond", g, a + S, b, F1, YB0, Z_CEIL_J, Z_CEIL_J + PIR)
+    add_pir("PIR plafond", g, a + S, b, F1, YR, Z_CEIL_J, Z_CEIL_J + PIR)
 
 g = "M Dak"
+BOEI_T = 18                   # boeiboord rondom; sporen en dakplaat zitten erbinnen
+RAFT_Y0, RAFT_Y1 = ROOF_Y0 + BOEI_T, ROOF_Y1 - BOEI_T     # -132, 871
+RAFT_L = RAFT_Y1 - RAFT_Y0    # 1003
+RAFT_H0, RAFT_H1 = round(roof_z(RAFT_Y0) - Z_RAFT), round(roof_z(RAFT_Y1) - Z_RAFT)
+SIDE_RAFT = (ROOF_X0 + BOEI_T, ROOF_X1 - BOEI_T - S)        # zijsporen tegen de binnenkant van het zijboeiboord
+RAFT_NOTE = f"schuin zagen: voor {RAFT_H0}, achter {RAFT_H1} hoog"
 for x in CEIL_X:
-    add("Spoor afschot", g, "B69", x, x + S, ROOF_Y0, ROOF_Y1, Z_RAFT, Z_RAFT + RAFT_F,
-        cut=(ROOF_L, J, S), note=f"schuin zagen: voor {RAFT_F}, achter {RAFT_B} hoog", extra={"slope": "raft"})
-add("Dakplaat", g, "OSB", ROOF_X0, ROOF_X1, ROOF_Y0, ROOF_Y1, Z_RAFT + RAFT_F, Z_RAFT + RAFT_F + OSB_T,
-    cut=(ROOF_W, ROOF_L, OSB_T), extra={"slope": "deck"})
+    add("Spoor afschot", g, "B69", x, x + S, RAFT_Y0, RAFT_Y1, Z_RAFT, Z_RAFT + RAFT_F,
+        cut=(RAFT_L, J, S), note=RAFT_NOTE, extra={"slope": "raft"})
+for x in SIDE_RAFT:
+    add("Zijspoor", g, "B69", x, x + S, RAFT_Y0, RAFT_Y1, Z_RAFT, Z_RAFT + RAFT_F,
+        cut=(RAFT_L, J, S), note=RAFT_NOTE + "; draagt plaatrand, trim en zij-onderplaat", extra={"slope": "raft"})
+# rijklossen tussen zijspoor en buitenste spoor: boven voorwand, midden, boven achterwand
+KLOS_Y = (F0, mid(F0, YB1) - S // 2, YB1 - S)
+for xa, xb in ((SIDE_RAFT[0] + S, CEIL_X[0]), (CEIL_X[-1] + S, SIDE_RAFT[1])):
+    for y in KLOS_Y:
+        add("Rijklos", g, "B69", xa, xb, y, y + S, Z_RAFT, Z_RAFT + RAFT_F, cut=(xb - xa, J, S),
+            note="bovenkant schuin, gelijk met de sporen: aftekenen; gat d16 voor ventilatie", extra={"slope": "raft"})
+add("Dakplaat", g, "OSB", ROOF_X0 + BOEI_T, ROOF_X1 - BOEI_T, RAFT_Y0, RAFT_Y1, Z_RAFT + RAFT_F, Z_RAFT + RAFT_F + OSB_T,
+    cut=(ROOF_W - 2 * BOEI_T, RAFT_L, OSB_T), note="tussen de boeiboorden", extra={"slope": "deck"})
 BOEI0 = Z_RAFT - 33
 BOEI_F, BOEI_B = RAFT_F + OSB_T + 33, RAFT_B + OSB_T + 33   # 101, 72
 add("Boeiboord links", g, "DK", ROOF_X0, ROOF_X0 + 18, ROOF_Y0, ROOF_Y1, BOEI0, Z_RAFT + RAFT_F + OSB_T,
@@ -345,7 +370,7 @@ for y in (F0, SIDE_Y[1], YB0):
     add("Lat rechts", g, "LAT", XR1, XR1 + BAT, y, y + S, ZC0, ZC1)
 for x in (XL1 - S, XR0):
     add("Lat voor hoek", g, "LAT", x, x + S, CLAD, F0, ZC0, ZC1)
-add("Lat voor beneden", g, "LAT", PART_X0, PART_X1, CLAD, F0, ZC0, Z_UP - S)
+add("Lat voor beneden", g, "LAT", PART_X0 + (J - S) // 2, PART_X0 + (J + S) // 2, CLAD, F0, ZC0, Z_UP - S)
 add("Lat kop raam boven", g, "LAT", XL1, XR0, CLAD, F0, Z_U_TOP, Z_U_TOP + S, note="10 mm onderbreken voor ventilatie")
 add("Lat band tussenvloer", g, "LAT", XL1, XR0, CLAD, F0, Z_UP - S, Z_UP, note="bovenkant gelijk met vloer: kozijn steunt erop")
 for xa, xb in ((XL1, PART_X0), (PART_X1, XR0)):
@@ -364,12 +389,12 @@ for x, y0 in ((0, 0), (W - 58, 0), (0, D - CLAD), (W - 58, D - CLAD)):
 for x, y0 in ((0, CLAD), (W - CLAD, CLAD), (0, D - 58), (W - CLAD, D - 58)):
     add("Hoeklat zijkant", g, "DK", x, x + CLAD, y0, y0 + F0, ZC0, ZC1)
 # voorkant: kader rond de ramen, dezelfde beits als de gevel. De kaderdelen sluiten op het kozijn aan.
-add("Kaderstijl boven links", g, "DM", 58, IN_X0, 0, CLAD, Z_UP, ZC1)
-add("Kaderstijl boven rechts", g, "DM", IN_X1, W - 58, 0, CLAD, Z_UP, ZC1)
-add("Kader boven raam", g, "DM", IN_X0, IN_X1, 0, CLAD, Z_U_TOP, ZC1)
+add("Kaderstijl boven links", g, "DM", 58, WIN_X0, 0, CLAD, Z_UP, ZC1)
+add("Kaderstijl boven rechts", g, "DM", WIN_X0 + WIN_U_W, W - 58, 0, CLAD, Z_UP, ZC1)
+add("Kader boven raam", g, "DM", WIN_X0, WIN_X0 + WIN_U_W, 0, CLAD, Z_U_TOP, ZC1)
 add("Band tussenvloer", g, "DM", 58, W - 58, 0, CLAD, Z_L_TOP, Z_UP)
-add("Kaderstijl beneden links", g, "DM", 58, IN_X0, 0, CLAD, Z_DECK, Z_L_TOP)
-add("Kaderstijl beneden rechts", g, "DM", ROOM_X1, VER_X0, 0, CLAD, Z_DECK, Z_L_TOP)
+add("Kaderstijl beneden links", g, "DM", 58, WIN_X0, 0, CLAD, Z_DECK, Z_L_TOP)
+add("Kaderstijl beneden rechts", g, "DM", WIN_X0 + WIN_L_W, VER_X0, 0, CLAD, Z_DECK, Z_L_TOP)
 add("Voorrand vloer", g, "DM", 58, W - 58, 0, CLAD, ZC0, Z_DECK)
 add("Afdekking wandkop veranda", g, "DM", IN_X1, W - 58, 0, CLAD, Z_DECK, Z_L_TOP, note="dekt de open wandkop af")
 CANOPY_DROP = 12              # luifel loopt over 90 mm dit stuk af naar voren
@@ -380,8 +405,8 @@ add("Regenluifel", g, "DK", 58, W - 58, -90, 0, Z_L_TOP + 12 - CANOPY_DROP, Z_L_
 # Niet-houten onderdelen die wel in de tekeningen moeten staan.
 # Ramen binnenstebuiten: de kozijnkant die normaal binnen zit, is gelijk met de gevel.
 # De vleugel steekt 19 mm naar buiten uit en draait naar buiten open.
-WIN_U = dict(x0=IN_X0, x1=IN_X1, y0=0, y1=WIN_D, z0=Z_UP, z1=Z_UP + WIN_H)
-WIN_L = dict(x0=IN_X0, x1=ROOM_X1, y0=0, y1=WIN_D, z0=Z_DECK, z1=Z_DECK + WIN_H)
+WIN_U = dict(x0=WIN_X0, x1=WIN_X0 + WIN_U_W, y0=0, y1=WIN_D, z0=Z_UP, z1=Z_UP + WIN_H)
+WIN_L = dict(x0=WIN_X0, x1=WIN_X0 + WIN_L_W, y0=0, y1=WIN_D, z0=Z_DECK, z1=Z_DECK + WIN_H)
 SIGHT_U, SIGHT_L = 118, 101
 VENT = dict(x=mid(BACK_U[3] + S, BACK_U[4]), z=Z_U_TOP - S - 60, d=100)
 
@@ -452,7 +477,7 @@ if __name__ == "__main__":
     print("onderdelen:", len(parts), "zaagregels:", len(cutlist()))
     print("hoogte:", Z_TOP, "binnen boven:", IN_X1 - IN_X0, IN_Y1 - IN_Y0, ROOM_H)
     print("trapkamer:", ROOM_X1 - IN_X0, "veranda:", IN_X1 - VER_X0, "voet bekleding:", CLAD_Z0)
-    print("buiten:", W, D, "dak:", ROOF_W, ROOF_L, "raam boven past:", IN_X1 - IN_X0 == WIN_U_W)
+    print("buiten:", W, D, "dak:", ROOF_W, ROOF_L, "opening boven:", XR0 - XL1, "beneden:", PART_X0 - XL1)
     print("trap: optrede", round(RISE, 1), "aantrede", round(TREAD, 1), "vrije hoogte onder dichte vloer:", round(stair_headroom()))
     print("botsingen:", len(c))
     for row in c:
