@@ -7,6 +7,7 @@ botsingscontrole komen allemaal uit deze ene lijst.
 
 De buitenmaat volgt uit het bovenraam (breedte) en IN_DEPTH (diepte).
 """
+import math
 from dataclasses import dataclass, field
 from collections import defaultdict
 
@@ -17,7 +18,7 @@ WIN_JOINT = 5                 # montagevoeg boven het kozijn: EPDM en doorbuigin
 IN_DEPTH = 600                # binnendiepte: achterkant kozijn -> binnenplaat achterwand
 CLAD, BAT = 18, 22            # gevelplank, spouwlat
 S, J = 44, 69                 # regel 44x44 en balk 44x69
-PLY, PLY_F = 9, 12            # Elliotis Pine wand/plafond, betonplex vloer
+PLY, PLY_F = 9, 12            # Lightply multiplex wand/plafond, betonplex vloer
 OSB_T, SOF_T = 11, 12         # dakplaat, overstekplaat (betonplex)
 PIR = J                       # plaat is 70: de 1 mm extra drukt in tegen de folie
 PIR_NOM = 70
@@ -69,13 +70,13 @@ ROOM_X1 = PART_X0 - PLY       # 602: rechterkant trapkamer (binnenplaat)
 VER_X0 = PART_X1 + PLY        # 689: linkerkant veranda
 ST_X1 = HOLE_X1 = IN_X0 + 247 # 365: rechterkant trap en trapgat
 
-# trap, hier al nodig omdat de maat van het trapgat eruit volgt
-ST_Y0 = IN_Y1 - (Z_UP - Z_DECK) # 76: voet trapboom; looplengte = stijging, dus 45 graden, 5 mm vrij van de EPDM-rand
+# trap, hier al nodig omdat de maat van het trapgat eruit volgt (ontwerp gebruiker, Betonplex_zaagplan_trap.dxf)
+ST_Y0 = IN_Y0 + 5                         # 76: voet trapboom, 5 mm vrij van de EPDM-rand achter het kozijn
 N_RISE = 6
 RISE = (Z_UP - Z_DECK) / N_RISE           # 99
-TREAD = RISE                              # 99: aantrede h.o.h.
-TREAD_D = 110                             # diepte van de trede: overlapt de volgende
-ST_T0 = IN_Y1 - TREAD_D - TREAD * (N_RISE - 2)   # 164: voorkant eerste trede, laatste trede tegen de achterwand
+TREAD = 100                               # aantrede van de middelste treden
+TREAD_D = (150, TREAD, TREAD, TREAD, IN_Y1 - ST_Y0 - 150 - 3 * TREAD)   # diepte per trede: 150, 3 x 100, 145
+TREAD_Y = tuple(ST_Y0 + sum(TREAD_D[:i]) for i in range(N_RISE - 1))   # voorkant per trede; treden sluiten op elkaar aan
 HOLE_Y0 = IN_Y1 - 343                     # 328: trapgat 343 diep
 
 
@@ -118,7 +119,7 @@ MAT = {
     "B69": "Vuren geschaafd 44x69",
     "I69": "Geimpregneerd 44x69",
     "P69": "Geimpregneerde paal 68x68",
-    "LP9": "Elliotis Pine 9 (C+/C, binnen)",
+    "LP9": "Lightply multiplex 9 (falcata, binnen)",
     "BP12": "Betonplex 12",
     "OSB": "OSB-3 11",
     "PIR": "PIR 70 alu",
@@ -264,7 +265,7 @@ add("Vloerplaat bovenkamer", g, "BP12", F0, XR1, F0, HOLE_Y0, z0, z1, cut=(XR1 -
 add("Vloerplaat bovenkamer", g, "BP12", F0, HOLE_X0, HOLE_Y0, YB1, z0, z1, count=False)
 add("Vloerplaat bovenkamer", g, "BP12", HOLE_X1, XR1, HOLE_Y0, YB1, z0, z1, count=False)
 add("Vloerplaat bovenkamer", g, "BP12", HOLE_X0, HOLE_X1, HOLE_Y1, YB1, z0, z1, count=False)
-# onderplaat: Elliotis Pine uit een stuk
+# onderplaat: Lightply uit een stuk
 z0, z1 = Z_L_TOP, Z_MID_J
 add("Onderplaat tussenvloer", g, "LP9", F0, XR1, F0, HOLE_Y0, z0, z1, cut=(XR1 - F0, YB1 - F0, PLY),
     note=HOLE_NOTE)
@@ -352,41 +353,63 @@ add("Onderplaat overstek rechts", g, "BP12", W + 15, ROOF_X1 - 18, -15, D + 15, 
 # --- Trap: tegen de linkerwand, stijgt van voor naar achter -------------------
 g = "N Trap"
 ST_X0, ST_Y1 = IN_X0, IN_Y1
-STRINGER_L = round(((ST_Y1 - ST_Y0) ** 2 + (Z_UP - Z_DECK) ** 2) ** 0.5 + 9)   # 850
-STRINGER_W = 130
+STRINGER_W = 130     # breedte van het plaatstuk, haaks op de helling
 STRIP_W = 30
+ST_K = RISE / TREAD                       # helling van de tandlijn
+ST_N = (1 + ST_K ** 2) ** 0.5             # verticale maat per mm haaks op de helling
+
+
+def _outer(y):
+    """Lijn door de buitenhoeken van de tanden (begin van elk zitvlak)."""
+    return Z_DECK + 2 * RISE - PLY_F + ST_K * (y - TREAD_Y[1])
+
+
+def _bottom(y):
+    """Rechte onderkant van de boom, evenwijdig aan de tandlijn."""
+    return _outer(y) - STRINGER_W * ST_N
+
+
+ST_FOOT = TREAD_Y[0] + (Z_DECK - _bottom(TREAD_Y[0])) / ST_K   # waar de onderkant de vloer raakt
 
 
 def stringer_outline():
-    """Zijaanzicht trapboom (y, z): rechte onderkant, zaagtanden met een zitvlak onder elke trede."""
+    """Zijaanzicht trapboom (y, z): rechte voet, schuine voorkant tot het eerste zitvlak, zaagtanden, rechte onderkant."""
     seat = [Z_DECK + RISE * (i + 1) - PLY_F for i in range(N_RISE - 1)]
-    front = [ST_T0 + TREAD * i for i in range(N_RISE - 1)]
-    pts = [(ST_Y0, Z_DECK), (front[0], seat[0])]
-    for i in range(1, N_RISE - 1):
-        pts += [(front[i], seat[i - 1]), (front[i], seat[i])]
-    drop = STRINGER_W * 2 ** 0.5                    # 184: horizontale maat van de boom op 45 graden
-    pts += [(ST_Y1, seat[-1]), (ST_Y1, Z_UP - drop), (ST_Y0 + drop, Z_DECK)]
+    b = TREAD_Y[1:]
+    pts = [(ST_Y0, Z_DECK), (ST_Y0, _outer(ST_Y0)), (b[0] - TREAD, seat[0])]
+    for i, y in enumerate(b):
+        pts += [(y, seat[i]), (y, seat[i + 1])]
+    pts += [(ST_Y1, seat[-1]), (ST_Y1, _bottom(ST_Y1)), (ST_FOOT, Z_DECK)]
     return pts
 
 
 def strip_outline():
-    """Zijaanzicht versterkingsstrook: langs de rechte onderkant van de rechterboom."""
-    drop = STRINGER_W * 2 ** 0.5
-    d = STRIP_W / 2 ** 0.5
-    a, b = (ST_Y0 + drop, Z_DECK), (ST_Y1, Z_UP - drop)
-    return [a, b, (b[0] - d, b[1] + d), (a[0] - d, a[1] + d)]
+    """Zijaanzicht versterkingsstrook: rechthoek langs de rechte onderkant van de rechterboom, haakse uiteinden."""
+    a, b = (ST_FOOT, Z_DECK), (ST_Y1, _bottom(ST_Y1))
+    dy, dz = -STRIP_W * ST_K / ST_N, STRIP_W / ST_N
+    return [a, b, (b[0] + dy, b[1] + dz), (a[0] + dy, a[1] + dz)]
 
+
+def _blank_length():
+    proj = [(y + ST_K * z) / ST_N for y, z in stringer_outline()]
+    return max(proj) - min(proj)
+
+
+assert all(d == TREAD for d in TREAD_D[1:-1]) and ST_Y0 < TREAD_Y[1] - TREAD
+STRINGER_L = math.ceil((_blank_length() + 5) / 10) * 10                 # 770: plaatstuk, ruim afgerond
+STRIP_L = math.floor((ST_Y1 - ST_FOOT) * ST_N / 10) * 10                # 630: langs de onderkant
+ST_CORNER = STRINGER_W - RISE / ST_N      # hout dat bij de binnenhoeken overblijft, ca. 60
 
 for x in (ST_X0, ST_X1 - PLY_F):
     add("Trapboom", g, "BP12", x, x + PLY_F, ST_Y0, ST_Y1, Z_DECK, Z_UP,
         cut=(STRINGER_L, STRINGER_W, PLY_F), note="zaagtanden, zie detail 6", extra={"stringer": 1})
-add("Versterkingsstrook trapboom", g, "BP12", ST_X1 - 2 * PLY_F, ST_X1 - PLY_F, ST_Y0 + STRINGER_W * 2 ** 0.5, ST_Y1,
-    Z_DECK, Z_UP - STRINGER_W * 2 ** 0.5, cut=(580, STRIP_W, PLY_F),
-    note="binnenkant rechterboom, uiteinden schuin; uit de rest", extra={"stringer": 2})
+add("Versterkingsstrook trapboom", g, "BP12", ST_X1 - 2 * PLY_F, ST_X1 - PLY_F, ST_FOOT - STRIP_W, ST_Y1,
+    Z_DECK, _bottom(ST_Y1) + STRIP_W * ST_N, cut=(STRIP_L, STRIP_W, PLY_F),
+    note="binnenkant rechterboom, langs de onderkant; uit de reststrook", extra={"stringer": 2})
 for i in range(N_RISE - 1):
     z = Z_DECK + RISE * (i + 1)
-    ya = ST_T0 + TREAD * i
-    add("Trede", g, "BP12", ST_X0, ST_X1, ya, ya + TREAD_D, z - PLY_F, z, note="op de tanden; anti-slip bekleden")
+    ya = TREAD_Y[i]
+    add("Trede", g, "BP12", ST_X0, ST_X1, ya, ya + TREAD_D[i], z - PLY_F, z, note="op de tanden; anti-slip bekleden")
 
 # --- Spouwlatten ---------------------------------------------------------------
 g = "P Spouwlatten"
@@ -472,7 +495,7 @@ def stair_headroom():
     """Kleinste vrije hoogte tussen een trede en de onderkant van de tussenvloer vóór het trapgat."""
     best = None
     for i in range(N_RISE - 1):
-        ya = ST_T0 + TREAD * i
+        ya = TREAD_Y[i]
         if ya < HOLE_Y0 - S:              # deze trede ligt nog onder de dichte vloer
             best = ROOM_H - RISE * (i + 1)
     return best
@@ -486,7 +509,7 @@ def cutlist():
     return [dict(group=k[0], name=k[1], mat=k[2], dims=k[3], note=k[4], qty=v) for k, v in sorted(rows.items())]
 
 
-DENS = {"R44": 480, "B69": 480, "I69": 520, "P69": 520, "LP9": 540, "BP12": 700, "OSB": 620, "PIR": 35, "LAT": 480, "DG": 530, "DK": 530, "DM": 530}
+DENS = {"R44": 480, "B69": 480, "I69": 520, "P69": 520, "LP9": 400, "BP12": 700, "OSB": 620, "PIR": 35, "LAT": 480, "DG": 530, "DK": 530, "DM": 530}
 
 
 def weight():
@@ -506,7 +529,7 @@ if __name__ == "__main__":
     print("hoogte:", Z_TOP, "binnen boven:", IN_X1 - IN_X0, IN_Y1 - IN_Y0, ROOM_H)
     print("trapkamer:", ROOM_X1 - IN_X0, "veranda:", IN_X1 - VER_X0, "voet bekleding:", CLAD_Z0)
     print("buiten:", W, D, "dak:", ROOF_W, ROOF_L, "opening boven:", XR0 - XL1, "beneden:", PART_X0 - XL1)
-    print("trap: optrede", round(RISE, 1), "aantrede", round(TREAD, 1), "vrije hoogte onder dichte vloer:", round(stair_headroom()))
+    print("trap: optrede", round(RISE, 1), "treden", TREAD_D, "boom", STRINGER_L, "x", STRINGER_W, "strook", STRIP_L, "binnenhoek", round(ST_CORNER), "vrije hoogte onder dichte vloer:", round(stair_headroom()))
     print("botsingen:", len(c))
     for row in c:
         print("  ", row)
