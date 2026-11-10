@@ -71,13 +71,34 @@ VER_X0 = PART_X1 + PLY        # 689: linkerkant veranda
 ST_X1 = HOLE_X1 = IN_X0 + 247 # 365: rechterkant trap en trapgat
 
 # trap, hier al nodig omdat de maat van het trapgat eruit volgt (ontwerp gebruiker, Betonplex_zaagplan_trap.dxf)
-ST_Y0 = IN_Y0 + 5                         # 76: voet trapboom, 5 mm vrij van de EPDM-rand achter het kozijn
+# De trap stijgt van achter naar voor (keuze gebruiker 10-11-2026): voet tegen de achterwand, bovenkant 5 mm achter
+# het lage kozijn, trapgat linksvoor, ligplek onder de trap bij het raam. Gerekend wordt in een rekenrichting die van
+# voor naar achter loopt: daarin staat de voet op ST_Y0 en de bovenkant op ST_Y1. SY spiegelt naar de werkelijke diepte,
+# waar de voet op 671 (tegen de achterwand) en de bovenkant op 76 (5 mm achter het kozijn) komt.
+ST_Y0 = IN_Y0 + 5                         # 76 in de rekenrichting
+ST_Y1 = IN_Y1                             # 671 in de rekenrichting
+
+
+def SY(y):
+    """Diepte in de rekenrichting -> werkelijke diepte."""
+    return ST_Y0 + ST_Y1 - y
+
+
+def SY2(a, b):
+    """Bereik in de rekenrichting -> werkelijk bereik (laag, hoog)."""
+    return tuple(sorted((SY(a), SY(b))))
+
 N_RISE = 6
 RISE = (Z_UP - Z_DECK) / N_RISE           # 99
 TREAD = 100                               # aantrede van de middelste treden
 TREAD_D = (150, TREAD, TREAD, TREAD, IN_Y1 - ST_Y0 - 150 - 3 * TREAD)   # diepte per trede: 150, 3 x 100, 145
 TREAD_Y = tuple(ST_Y0 + sum(TREAD_D[:i]) for i in range(N_RISE - 1))   # voorkant per trede; treden sluiten op elkaar aan
-HOLE_Y0 = IN_Y1 - 343                     # 328: trapgat 343 diep
+TREAD_AT = tuple(SY2(y, y + d) for y, d in zip(TREAD_Y, TREAD_D))   # werkelijke diepte per trede (voor, achter)
+HOLE_L = 343                              # trapgat 343 diep
+HOLE_Y0 = F1 + PLY                        # 93: achter de rand voor en zijn dagkant, zodat het kozijn boven op de rand blijft
+HOLE_Y1 = HOLE_Y0 + HOLE_L                # 436
+TAB_Y0, TAB_Y1 = HOLE_Y0, HOLE_Y0 + 40     # lip vrije boom: vlak achter de dagkant voor, 40 breed
+TAB_Z1 = Z_MID_T - 14                     # 830: 14 onder de bovenkant van de balk, vrij van de vloerplaat
 
 
 def mid(a, b):
@@ -257,33 +278,34 @@ add("Binnenplaat", g, "LP9", IN_X1, XR0, CLAD, IN_Y1, Z0, Z1, note="loopt door t
 
 # --- Tussenvloer ------------------------------------------------------------
 g = "G Tussenvloer"
-HOLE_X0, HOLE_Y1 = IN_X0, IN_Y1
+HOLE_X0 = IN_X0
 HOLE_NOTE = f"met uitsparing trapgat {HOLE_X1-HOLE_X0}x{HOLE_Y1-HOLE_Y0}"
-# bovenplaat: betonplex uit een stuk
-z0, z1 = Z_MID_T, Z_UP
-add("Vloerplaat bovenkamer", g, "BP12", F0, XR1, F0, HOLE_Y0, z0, z1, cut=(XR1 - F0, YB1 - F0, PLY_F), note=HOLE_NOTE)
-add("Vloerplaat bovenkamer", g, "BP12", F0, HOLE_X0, HOLE_Y0, YB1, z0, z1, count=False)
-add("Vloerplaat bovenkamer", g, "BP12", HOLE_X1, XR1, HOLE_Y0, YB1, z0, z1, count=False)
-add("Vloerplaat bovenkamer", g, "BP12", HOLE_X0, HOLE_X1, HOLE_Y1, YB1, z0, z1, count=False)
-# onderplaat: Lightply uit een stuk
-z0, z1 = Z_L_TOP, Z_MID_J
-add("Onderplaat tussenvloer", g, "LP9", F0, XR1, F0, HOLE_Y0, z0, z1, cut=(XR1 - F0, YB1 - F0, PLY),
-    note=HOLE_NOTE)
-add("Onderplaat tussenvloer", g, "LP9", F0, HOLE_X0, HOLE_Y0, YB1, z0, z1, count=False)
-add("Onderplaat tussenvloer", g, "LP9", HOLE_X1, XR1, HOLE_Y0, YB1, z0, z1, count=False)
-add("Onderplaat tussenvloer", g, "LP9", HOLE_X0, HOLE_X1, HOLE_Y1, YB1, z0, z1, count=False)
+
+
+def plate_with_hole(name, mat, z0, z1, t):
+    """Plaat uit één stuk over de hele tussenvloer, met het trapgat eruit: vier vakken rond het gat."""
+    boxes = [(F0, XR1, F0, HOLE_Y0), (F0, XR1, HOLE_Y1, YB1), (F0, HOLE_X0, HOLE_Y0, HOLE_Y1), (HOLE_X1, XR1, HOLE_Y0, HOLE_Y1)]
+    boxes = [b for b in boxes if b[1] - b[0] > 0.5 and b[3] - b[2] > 0.5]
+    for i, b in enumerate(boxes):
+        if i == 0:
+            add(name, g, mat, *b, z0, z1, cut=(XR1 - F0, YB1 - F0, t), note=HOLE_NOTE)
+        else:
+            add(name, g, mat, *b, z0, z1, count=False)
+
+
+plate_with_hole("Vloerplaat bovenkamer", "BP12", Z_MID_T, Z_UP, PLY_F)        # betonplex uit een stuk
+plate_with_hole("Onderplaat tussenvloer", "LP9", Z_L_TOP, Z_MID_J, PLY)       # Lightply uit een stuk
 add("Rand voor", g, "B69", F0, XR1, F0, F1, Z_MID_J, Z_MID_T)
 add("Rand achter", g, "B69", F0, XR1, YR, YB1, Z_MID_J, Z_MID_T)
 for x in MID_X:
     add("Balk", g, "B69", x, x + S, F1, YR, Z_MID_J, Z_MID_T)
 add("Opvulstrook trapgat", g, "B69", F1, XL1, F1, YR, Z_MID_J, Z_MID_T, note="44x69 rifen: steunt de plaat tot aan het trapgat")
-add("Raveelbalk trapgat", g, "B69", XL1, HOLE_X1, HOLE_Y0 - S, HOLE_Y0, Z_MID_J, Z_MID_T)
-add("Dagkant trapgat links", g, "LP9", XL1, IN_X0, HOLE_Y0, IN_Y1, Z_MID_J, Z_MID_T)
-add("Dagkant trapgat achter", g, "LP9", HOLE_X0, HOLE_X1, IN_Y1, YB0, Z_MID_J, Z_MID_T)
-add_pir("PIR tussenvloer", g, XL1, HOLE_X1, F1, HOLE_Y0 - S, Z_MID_T - PIR, Z_MID_T)
+add("Dagkant trapgat links", g, "LP9", XL1, IN_X0, HOLE_Y0, HOLE_Y1, Z_MID_J, Z_MID_T)
+add("Raveelbalk trapgat", g, "B69", XL1, HOLE_X1, HOLE_Y1, HOLE_Y1 + S, Z_MID_J, Z_MID_T)
+add("Dagkant trapgat voor", g, "LP9", HOLE_X0, HOLE_X1, F1, HOLE_Y0, Z_MID_J, Z_MID_T)
+add_pir("PIR tussenvloer", g, XL1, HOLE_X1, HOLE_Y1 + S, YR, Z_MID_T - PIR, Z_MID_T)
 for xa, xb in ((HOLE_X1 + S, PART_X0), (PART_X0 + S, MID_X[3]), (MID_X[3] + S, XB)):
     add_pir("PIR tussenvloer", g, xa, xb, F1, YR, Z_MID_T - PIR, Z_MID_T)
-add_pir("PIR achter trapgat", g, XL1, HOLE_X1, YB0, YR, Z_MID_T - PIR, Z_MID_T)
 
 # --- Bovenverdieping --------------------------------------------------------
 Z0, Z1 = Z_UP, Z_U_TOP
@@ -352,7 +374,7 @@ add("Onderplaat overstek rechts", g, "BP12", W + 15, ROOF_X1 - 18, -15, D + 15, 
 
 # --- Trap: tegen de linkerwand, stijgt van voor naar achter -------------------
 g = "N Trap"
-ST_X0, ST_Y1 = IN_X0, IN_Y1
+ST_X0 = IN_X0
 STRINGER_W = 130     # breedte van het plaatstuk, haaks op de helling
 STRIP_W = 30
 ST_K = RISE / TREAD                       # helling van de tandlijn
@@ -372,8 +394,8 @@ def _bottom(y):
 ST_FOOT = TREAD_Y[0] + (Z_DECK - _bottom(TREAD_Y[0])) / ST_K   # waar de onderkant de vloer raakt
 
 
-def stringer_outline():
-    """Zijaanzicht trapboom (y, z): rechte voet, schuine voorkant tot het eerste zitvlak, zaagtanden, rechte onderkant."""
+def _stringer_fwd():
+    """Zijaanzicht trapboom (y, z) in de rekenrichting: rechte voet, schuine voorkant tot het eerste zitvlak, zaagtanden, rechte onderkant."""
     seat = [Z_DECK + RISE * (i + 1) - PLY_F for i in range(N_RISE - 1)]
     b = TREAD_Y[1:]
     pts = [(ST_Y0, Z_DECK), (ST_Y0, _outer(ST_Y0)), (b[0] - TREAD, seat[0])]
@@ -383,33 +405,66 @@ def stringer_outline():
     return pts
 
 
-def strip_outline():
-    """Zijaanzicht versterkingsstrook: rechthoek langs de rechte onderkant van de rechterboom, haakse uiteinden."""
+def _tab_fwd():
+    """Lip aan de bovenkant van de vrije (rechter)boom, in de rekenrichting: steekt in het trapgat omhoog langs de balk
+    rechts van het trapgat en wordt daarin geschroefd."""
+    return SY(TAB_Y1), SY(TAB_Y0)
+
+
+def stringer_fwd(free=False):
+    """Trapboom in de rekenrichting (voor het plaatstuk). free: de rechterboom, met de lip bovenaan."""
+    pts = _stringer_fwd()
+    if free:
+        seat = Z_DECK + RISE * (N_RISE - 1) - PLY_F
+        i = next(k for k in range(len(pts) - 1) if pts[k][1] == seat and pts[k + 1] == (ST_Y1, seat))
+        a, b = _tab_fwd()
+        pts = pts[:i + 1] + [(a, seat), (a, TAB_Z1), (b, TAB_Z1), (b, seat)] + pts[i + 1:]
+    return pts
+
+
+def stringer_outline(free=False):
+    """Zijaanzicht trapboom (y, z) zoals hij staat. free: de rechterboom, met de lip bovenaan."""
+    return [(SY(y), z) for y, z in stringer_fwd(free)]
+
+
+def strip_fwd():
+    """Versterkingsstrook in de rekenrichting: rechthoek langs de rechte onderkant van de rechterboom, haakse uiteinden."""
     a, b = (ST_FOOT, Z_DECK), (ST_Y1, _bottom(ST_Y1))
     dy, dz = -STRIP_W * ST_K / ST_N, STRIP_W / ST_N
     return [a, b, (b[0] + dy, b[1] + dz), (a[0] + dy, a[1] + dz)]
 
 
+def strip_outline():
+    """Zijaanzicht versterkingsstrook zoals hij zit."""
+    return [(SY(y), z) for y, z in strip_fwd()]
+
+
 def _blank_length():
-    proj = [(y + ST_K * z) / ST_N for y, z in stringer_outline()]
+    proj = [(y + ST_K * z) / ST_N for y, z in stringer_fwd(free=True)]   # met de lip: beide bomen uit hetzelfde maatstuk
     return max(proj) - min(proj)
 
 
 assert all(d == TREAD for d in TREAD_D[1:-1]) and ST_Y0 < TREAD_Y[1] - TREAD
-STRINGER_L = math.ceil((_blank_length() + 5) / 10) * 10                 # 770: plaatstuk, ruim afgerond
+STRINGER_L = math.ceil((_blank_length() + 3) / 5) * 5                   # 815: plaatstuk met lip, 3 mm marge
 STRIP_L = math.floor((ST_Y1 - ST_FOOT) * ST_N / 10) * 10                # 630: langs de onderkant
 ST_CORNER = STRINGER_W - RISE / ST_N      # hout dat bij de binnenhoeken overblijft, ca. 60
+# de lip moet binnen de breedte van het plaatstuk blijven: onder de lijn door de buitenhoeken
+assert TAB_Z1 <= _outer(SY(TAB_Y1)) - 1, ("lip steekt buiten het plaatstuk", TAB_Z1, _outer(SY(TAB_Y1)))
 
-for x in (ST_X0, ST_X1 - PLY_F):
-    add("Trapboom", g, "BP12", x, x + PLY_F, ST_Y0, ST_Y1, Z_DECK, Z_UP,
-        cut=(STRINGER_L, STRINGER_W, PLY_F), note="zaagtanden, zie detail 6", extra={"stringer": 1})
-add("Versterkingsstrook trapboom", g, "BP12", ST_X1 - 2 * PLY_F, ST_X1 - PLY_F, ST_FOOT - STRIP_W, ST_Y1,
+add("Trapboom", g, "BP12", ST_X0, ST_X0 + PLY_F, *SY2(ST_Y0, ST_Y1), Z_DECK, Z_UP,
+    cut=(STRINGER_L, STRINGER_W, PLY_F), note="zaagtanden, zie detail 6", extra={"stringer": 1})
+add("Trapboom", g, "BP12", ST_X1 - PLY_F, ST_X1, *SY2(ST_Y0, ST_Y1), Z_DECK, Z_UP,
+    cut=(STRINGER_L, STRINGER_W, PLY_F), extra={"stringer": 3},
+    note=f"zaagtanden en lip {TAB_Y1 - TAB_Y0} breed bovenaan, zie detail 6")
+add("Versterkingsstrook trapboom", g, "BP12", ST_X1 - 2 * PLY_F, ST_X1 - PLY_F, *SY2(ST_FOOT - STRIP_W, ST_Y1),
     Z_DECK, _bottom(ST_Y1) + STRIP_W * ST_N, cut=(STRIP_L, STRIP_W, PLY_F),
     note="binnenkant rechterboom, langs de onderkant; uit de reststrook", extra={"stringer": 2})
 for i in range(N_RISE - 1):
     z = Z_DECK + RISE * (i + 1)
-    ya = TREAD_Y[i]
-    add("Trede", g, "BP12", ST_X0, ST_X1, ya, ya + TREAD_D[i], z - PLY_F, z, note="op de tanden; anti-slip bekleden")
+    notch = i == N_RISE - 2
+    add("Trede", g, "BP12", ST_X0, ST_X1, *TREAD_AT[i], z - PLY_F, z,
+        note=f"op de tanden; rechts inkeping {PLY_F} x {TAB_Y1 - TAB_Y0} voor de lip, {TAB_Y0 - TREAD_AT[i][0]} uit de voorkant; anti-slip bekleden"
+        if notch else "op de tanden; anti-slip bekleden")
 
 # --- Spouwlatten ---------------------------------------------------------------
 g = "P Spouwlatten"
@@ -480,6 +535,46 @@ def collisions():
     return out
 
 
+def _inside(pt, poly):
+    x, y = pt
+    c = False
+    for (x1, y1), (x2, y2) in zip(poly, poly[1:] + poly[:1]):
+        if (y1 > y) != (y2 > y) and x < x1 + (y - y1) * (x2 - x1) / (y2 - y1):
+            c = not c
+    return c
+
+
+def _cross(p1, p2, q1, q2):
+    d = lambda a, b, c: (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+    return d(p1, p2, q1) * d(p1, p2, q2) < 0 and d(q1, q2, p1) * d(q1, q2, p2) < 0
+
+
+def stringer_clashes(tol=0.5):
+    """Botsingen van de werkelijke vorm van de trapbomen (zijaanzicht) met andere onderdelen in hun breedte."""
+    out = []
+    for p in parts:
+        k = p.extra.get("stringer")
+        if k not in (1, 3):
+            continue
+        poly = stringer_outline(free=(k == 3))
+        for q in parts:
+            if q is p or q.extra.get("stringer") or q.extra.get("slope") or q.extra.get("trim"):
+                continue
+            if min(p.box[1], q.box[1]) - max(p.box[0], q.box[0]) <= tol:
+                continue
+            y0, y1, z0, z1 = q.box[2] + tol, q.box[3] - tol, q.box[4] + tol, q.box[5] - tol
+            if y1 <= y0 or z1 <= z0:
+                continue
+            if q.name == "Trede" and k == 3 and "inkeping" in q.note:
+                continue        # de lip gaat door de inkeping van de bovenste trede
+            rc = [(y0, z0), (y1, z0), (y1, z1), (y0, z1)]
+            hit = any(y0 < a < y1 and z0 < b < z1 for a, b in poly) or any(_inside(c_, poly) for c_ in rc) or \
+                any(_cross(a, b, c_, d_) for a, b in zip(poly, poly[1:] + poly[:1]) for c_, d_ in zip(rc, rc[1:] + rc[:1]))
+            if hit:
+                out.append((p.group, p.name + (" rechts" if k == 3 else " links"), q.group, q.name))
+    return out
+
+
 def window_clearance():
     """Raamkozijnen mogen niets raken; meld wat overlapt."""
     res = []
@@ -495,8 +590,8 @@ def stair_headroom():
     """Kleinste vrije hoogte tussen een trede en de onderkant van de tussenvloer vóór het trapgat."""
     best = None
     for i in range(N_RISE - 1):
-        ya = TREAD_Y[i]
-        if ya < HOLE_Y0 - S:              # deze trede ligt nog onder de dichte vloer
+        ya, yb = TREAD_AT[i]
+        if ya < HOLE_Y0 - S or yb > HOLE_Y1 + S:   # deze trede ligt nog onder de dichte vloer
             best = ROOM_H - RISE * (i + 1)
     return best
 
@@ -530,7 +625,7 @@ if __name__ == "__main__":
     print("trapkamer:", ROOM_X1 - IN_X0, "veranda:", IN_X1 - VER_X0, "voet bekleding:", CLAD_Z0)
     print("buiten:", W, D, "dak:", ROOF_W, ROOF_L, "opening boven:", XR0 - XL1, "beneden:", PART_X0 - XL1)
     print("trap: optrede", round(RISE, 1), "treden", TREAD_D, "boom", STRINGER_L, "x", STRINGER_W, "strook", STRIP_L, "binnenhoek", round(ST_CORNER), "vrije hoogte onder dichte vloer:", round(stair_headroom()))
-    print("botsingen:", len(c))
+    print("botsingen:", len(c), "trapbomen:", stringer_clashes())
     for row in c:
         print("  ", row)
     print("raamconflicten:", window_clearance())

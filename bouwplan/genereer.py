@@ -195,7 +195,8 @@ def geometry(p, axis):
         if kind == "deck":
             return [(y0, m.roof_z(y0)), (y1, m.roof_z(y1)), (y1, m.roof_z(y1) + m.OSB_T), (y0, m.roof_z(y0) + m.OSB_T)]
         if p.extra.get("stringer"):
-            return m.stringer_outline() if p.extra["stringer"] == 1 else m.strip_outline()
+            k = p.extra["stringer"]
+            return m.strip_outline() if k == 2 else m.stringer_outline(free=(k == 3))
         if p.extra.get("trim"):
             return [(y0, z0), (y1, z0), (y1, m.roof_z(y1) + m.OSB_T), (y0, m.roof_z(y0) + m.OSB_T)]
     return None
@@ -732,7 +733,7 @@ def plate_plans(by, short):
     wall = dims("LP9", "C:Binnenplaat")[1]
     s1 = S("y", [(g_[0], S("x", [(g_[1], P("G:Onderplaat tussenvloer")), (g_[1], P("L:Plafondplaat")),
                                  (wall, P("C:Binnenplaat")), (wall, P("I:Binnenplaat"))], trim=True)),
-                 (None, H("G:Dagkant trapgat links", "G:Dagkant trapgat achter"))])
+                 (None, H("G:Dagkant trapgat links", "G:Dagkant trapgat voor"))])
     st = lambda names: S("x", [(dims("LP9", n_)[0], P(n_)) for n_ in names] + [(None, R())])
     s2 = S("y", [(wall, st(["E:Plaat verandazijde", "D:Binnenplaat", "E:Plaat trapzijde"])),
                  (wall, st(["F:Binnenplaat", "K:Binnenplaat", "J:Binnenplaat"])),
@@ -981,28 +982,36 @@ def details_page(sh):
     v = View(c, 300, 110, 10)
     depth = m.IN_Y1 - m.IN_Y0
     climb = m.Z_UP - m.Z_DECK
-    hole0 = m.HOLE_Y0 - m.IN_Y0
+    hole0, hole1 = m.HOLE_Y0 - m.IN_Y0, m.HOLE_Y1 - m.IN_Y0
     rect(v, 0, depth, -12, 0, floor18)
-    rect(v, 0, hole0, m.ROOM_H, climb, beam)
-    h0 = m.ST_Y0 - m.IN_Y0
+    if hole0 > 0:
+        rect(v, 0, hole0, m.ROOM_H, climb, beam)
+    if hole1 < depth:
+        rect(v, hole1, depth, m.ROOM_H, climb, beam)
+    s0, s1 = m.SY2(m.ST_Y0, m.ST_Y1)
+    h0, h1 = s0 - m.IN_Y0, s1 - m.IN_Y0
+    rect(v, hole0, hole1, m.ROOM_H + 9, climb - 12, None, lw=0.3)            # balk rechts van het trapgat, erachter
+    poly(v, [(y - m.IN_Y0, z - m.Z_DECK) for y, z in m.stringer_outline(free=True)], C("#c49a6c"))
     poly(v, [(y - m.IN_Y0, z - m.Z_DECK) for y, z in m.stringer_outline()], floor18)
+    leader(v, (m.TAB_Y0 + m.TAB_Y1) / 2 - m.IN_Y0, m.TAB_Z1 - m.Z_DECK - 20, 338, 176,
+           f"Lip rechterboom: 2 x RVS 4 x 40 in de balk", 5.2)
     poly(v, [(y - m.IN_Y0, z - m.Z_DECK) for y, z in m.strip_outline()], C("#7f5a34"))
     for i in range(m.N_RISE - 1):
         z = m.RISE * (i + 1)
-        y = m.TREAD_Y[i] - m.IN_Y0
-        rect(v, y, y + m.TREAD_D[i], z - 12, z, C("#7f5a34"))
-        dim(v, y, z, y + m.TREAD_D[i], z, 3, str(m.TREAD_D[i]), 4.5)
+        ya, yb = (t - m.IN_Y0 for t in m.TREAD_AT[i])
+        rect(v, ya, yb, z - 12, z, C("#7f5a34"))
+        dim(v, ya, z, yb, z, 3, str(m.TREAD_D[i]), 4.5)
     dim(v, depth, 0, depth, climb, 5, str(climb), 5.5)
-    dim(v, h0, -12, depth, -12, -3, str(depth - h0), 5.5)
+    dim(v, h0, -12, h1, -12, -3, str(round(h1 - h0)), 5.5)
     label(c, 290, 97.5, f"{m.N_RISE} optreden van {round(m.RISE)}, treden {TREADS} diep, {m.ST_X1-m.ST_X0} breed, helling {STAIR_DEG}°. Sisal", 6.3)
-    label(c, 290, 94.5, "of rubbermat. Donkere strook: versterking binnenkant rechterboom. Plaats de trap vóór de tussenvloer.", 6.3)
+    label(c, 290, 94.5, "of rubbermat. Donker: versterking rechterboom, licht: lip. Trap vóór de tussenvloer plaatsen.", 6.3)
 
     # 7 ventilatie
     detail_box(c, 14, 28, 196, 60, "7  Ventilatie (natuurlijke trek)")
     label(c, 18, 78, f"Afvoer: PVC Ø100 door de achterwand, hart z = {m.VENT['z']} ({m.Z_U_TOP-m.VENT['z']} onder het plafond), x = {m.VENT['x']}.", 6.5)
     label(c, 18, 74, "Binnen: afsluitbaar rooster Ø100. Buiten: rooster Ø100, buis licht aflopend naar buiten; RVS-gaas ca. 1 mm erachter, jaarlijks nakijken.", 6.5)
     label(c, 18, 70, f"Aanvoer: open voorkant -> veranda -> lage inlaat {m.VENT_W} x {m.VENT_H} onder het kattenluik -> trapkamer -> trapgat {m.HOLE_X1-m.HOLE_X0} x {m.HOLE_Y1-m.HOLE_Y0}.", 6.5)
-    label(c, 18, 66, "De afvoer zit rechtsachter en het trapgat linksachter: de lucht loopt langs de achterwand, niet over het bed bij het raam.", 6.5)
+    label(c, 18, 66, "Trapgat linksvoor, afvoer rechtsachter: boven loopt de lucht schuin door de kamer, dus de mand rechts van het trapgat, uit die lijn.", 6.5)
     label(c, 18, 60, "Stand rooster: vorst bijna dicht (circa 2 m³/h volstaat), 0-5 °C half open, boven 5 °C helemaal open.", 6.5, True)
     label(c, 18, 56, "Hygrometer in de bovenkamer. Blijft de luchtvochtigheid langdurig boven 75-80 %: rooster verder open of", 6.5)
     label(c, 18, 52, "een kleine 12 V-ventilator op hygrostaat op het binnenrooster (Ø100 past daarvoor).", 6.5)
@@ -1265,7 +1274,7 @@ def write_drawings(path):
     dim(v, m.IN_X1, m.IN_Y0, m.IN_X1, m.IN_Y1, 13, str(m.IN_Y1 - m.IN_Y0), 6)
     dim(v, 0, 0, 0, m.D, -6, str(m.D), 6)
     dim(v, m.HOLE_X0, m.HOLE_Y1, m.HOLE_X1, m.HOLE_Y1, -17, f"gat {m.HOLE_X1-m.HOLE_X0}", 5.5)
-    label(c, 225, 257.5, "Raam voor, trapgat linksachter, afvoer rechtsachter, verwarming rechterwand, mand bij het raam.", 6.5)
+    label(c, 225, 257.5, "Raam voor, trapgat linksvoor, afvoer rechtsachter, verwarming rechterwand, mand bij het raam rechts van het trapgat.", 6.5)
     v = View(c, 40, 46, 10)
     view_title(c, 40, 140, "Vloerframe, gezien van boven (vloerplaat weg)")
     plan(v, m.Z_DECK0 - 1, only=lambda p: p.group.startswith("A"))
@@ -1296,7 +1305,7 @@ def write_drawings(path):
     for a, b, t in ((m.F0, m.HOLE_Y0, None), (m.HOLE_Y0, m.HOLE_Y1, f"gat {m.HOLE_Y1 - m.HOLE_Y0}"), (m.HOLE_Y1, m.YB1, None)):
         dim(v, m.F0, a, m.F0, b, -5, t, 5.3)
     dim(v, m.F0, m.HOLE_Y0, m.HOLE_X0, m.HOLE_Y0, -3, size=5.3)
-    label(c, 225, 135.5, f"Trapgat {HOLE} in onderplaat en vloerplaat: {m.HOLE_X0 - m.F0} uit de linkerrand, {m.YB1 - m.HOLE_Y1} uit de achterrand.", 6)
+    label(c, 225, 135.5, f"Trapgat {HOLE} in onderplaat en vloerplaat: {m.HOLE_X0 - m.F0} uit de linkerrand, {m.HOLE_Y0 - m.F0} uit de voorrand.", 6)
     legend(c, 18, 28)
 
     # T7 dakplattegronden
@@ -1440,20 +1449,21 @@ def bp12_page(sh):
 
     # trapboom op het plaatstuk, uitgeslagen
     x0, y0 = 232, 86
-    label(c, x0, oy - 14, f"Trapboom op het plaatstuk {m.STRINGER_L} x {m.STRINGER_W} (1:5)", 8.5, True, ACC)
+    label(c, x0, oy - 14, f"Rechterboom op het plaatstuk {m.STRINGER_L} x {m.STRINGER_W} (1:5)", 8.5, True, ACC)
     k, n = m.ST_K, m.ST_N
-    pts = m.stringer_outline()
+    pts = m.stringer_fwd(free=True)
     uv = [((yy + k * zz) / n, (-k * yy + zz) / n) for yy, zz in pts]
     u0, v0 = min(u for u, _ in uv), min(q for _, q in uv)
     vs = View(c, x0, y0, 5)
     rect(vs, 0, m.STRINGER_L, 0, m.STRINGER_W, C("#f4f1ea"))
     poly(vs, [(u - u0, q - v0) for u, q in uv], FILL[m.MAT["BP12"]])
-    su = [((yy + k * zz) / n - u0, (-k * yy + zz) / n - v0) for yy, zz in m.strip_outline()]
+    su = [((yy + k * zz) / n - u0, (-k * yy + zz) / n - v0) for yy, zz in m.strip_fwd()]
     poly(vs, su, C("#7f5a34"))
     dim(vs, 0, 0, m.STRINGER_L, 0, -4, str(m.STRINGER_L))
     dim(vs, m.STRINGER_L, 0, m.STRINGER_L, m.STRINGER_W, 4, str(m.STRINGER_W))
     para(x0, y0 - 9, 176, f"Onderkant langs de lange zaagkant van het stuk. Tanden: optrede {round(m.RISE)}, treden {TREADS} diep. "
-         f"Bij de binnenhoeken blijft ca. {round(m.ST_CORNER)} mm hout over. Donker: versterkingsstrook {m.STRIP_L} x {m.STRIP_W} op de rechterboom.", 6.3)
+         f"Bij de binnenhoeken blijft ca. {round(m.ST_CORNER)} mm hout over. Donker: versterkingsstrook {m.STRIP_L} x {m.STRIP_W} op de rechterboom. "
+         f"Getekend is de rechterboom, met de lip van {m.TAB_Y1 - m.TAB_Y0} breed aan de bovenkant; bij de linkerboom zaag je de lip weg.", 6.3)
 
 
 def flap_page(sh):
@@ -1761,7 +1771,7 @@ def write_text(path_a, path_b):
         f"<b>Zo klein mogelijk rond het bovenraam.</b> Het raam van 1000 mm zit tussen twee hoekstijlen die er strak tegenaan komen, met {m.WIN_GAP} mm speling per kant. Daardoor is het chalet {m.W} mm breed. De binnenplaten steken {m.IN_X0 - m.WIN_X0} mm voorbij het kozijn. De kamers zijn {m.IN_Y1-m.IN_Y0} mm diep, gemeten vanaf de achterkant van het kozijn; buitenmaat {m.D} mm.",
         f"<b>Kozijn direct op de vloer, geen dorpellat.</b> Kamers {m.ROOM_H} mm hoog: raam {m.WIN_H} plus {m.WIN_JOINT} mm montagevoeg boven, zodat het kozijn past en het plafond er niet op rust. Totale hoogte {round(m.Z_TOP)} mm, onder de 1650-1750 uit de overdracht. Dit geeft minder waterreserve dan de eerdere opstand van 30 mm; zie 'Ramen binnenstebuiten'.",
         f"<b>Zijkant veranda dicht.</b> Toegang alleen via de voorkant. De verandapaal vervalt, waardoor de veranda {m.IN_X1-m.VER_X0} mm breed wordt.",
-        f"<b>Trap tegen de linkerwand,</b> stijgend van voor naar achter, met het trapgat linksachter. De voet van de trapboom staat {m.ST_Y0-m.IN_Y0} mm achter het kozijn, vrij van de EPDM-rand; dat kan, omdat de vleugel nu naar buiten draait. Helling {STAIR_DEG}°, jouw keuze.",
+        f"<b>Trap tegen de linkerwand,</b> stijgend van achter naar voor (jouw keuze), met het trapgat linksvoor. De voet staat tegen de achterwand, vlak bij het kattenluik. De bovenkant blijft {m.ST_Y0-m.IN_Y0} mm achter het kozijn, zodat de trap niet op het raam steunt; de vrije rechterboom hangt daar met een lip aan de balk rechts van het trapgat. Onder de bovenste treden, tegen het lage raam, ontstaat een ligplek. Helling {STAIR_DEG}°, jouw keuze.",
         "<b>Lightply multiplex 9 mm als wandbekleding en betonplex 12 mm voor de vloeren.</b> Lightply is jouw keuze (10-11-2026) in plaats van Elliotis Pine: iets duurder, maar egaal en zonder kwasten. Betonplex 12 is goedkoper dan 18 mm. Zie 'Plaatmateriaal'.",
         "<b>Op het terras, met poeren onder de tegels.</b> De U-paalhouders staan in vers beton en steken door een gat in de tegel. Zo blijft het terras heel en het beton uit het zicht. Weghalen kan door de staven door te slijpen en de 6 tegels te vervangen.",
     ):
@@ -1875,7 +1885,7 @@ def write_text(path_a, path_b):
              ["Elektra en hitte", "Verwarming achter stalen kap, kabels in mantelbuis, thermostaat buiten bereik, maximaalthermostaat, aardlek."],
              ["Brand", "PIR niet bij warmtebron; niet-brandbare plaat achter verwarming; afstand volgens fabrikant. Geen warmtelamp en geen open gloeielement."],
              ["Vastzitten", f"Kattenluik {m.FLAP_W} x {m.FLAP_H}, met een magneet; trapgat {HOLE}. Ventilatiegaten met RVS gaas. Treden liggen op de tanden en steken niet buiten de bomen uit; geen kier waar een poot in kan."],
-             ["Trap", f"Treden met sisal of rubber. Hoek {STAIR_DEG}°: steil voor een oudere of stijve kat, dus controleer dat in de eerste weken. De bovenste trede komt tegen de achterwand; de kat stapt daar zijwaarts of vooruit de kamer in."],
+             ["Trap", f"Treden met sisal of rubber. Hoek {STAIR_DEG}°: steil voor een oudere of stijve kat, dus controleer dat in de eerste weken. De onderste trede staat tegen de achterwand, bij het luik; boven komt de kat uit bij het grote raam. Onder de trap, bij het lage raam, is een ligplek: {m.ST_X1 - 2 * m.PLY_F - m.ST_X0 - m.PLY_F} breed tussen de bomen en onder de bovenste trede {round(m.RISE * (m.N_RISE - 1)) - m.PLY_F} hoog, aan de rechterkant over de hele lengte open, dus geen plek om vast te komen zitten. In de winter is het daar het koudst en loopt de verse lucht erlangs: een kussen, geen verwarming."],
              ["Lage kamers", f"Vrije hoogte {m.ROOM_H} mm: ruim genoeg voor een kat, minder om te klimmen of springen. Mand laag houden, zodat de kat nog door het raam kan kijken."],
              ["Houtbehandeling", "Gebruik de houtbeits alleen buiten. Binnen geen biocide. De TENCO-lak bevat oplosmiddel: lak de platen vóór montage en goed geventileerd, en laat ze dagen luchten tot je niets meer ruikt voordat de kat erin gaat. Controleer het veiligheidsblad van elk product."],
              ["Tocht", "Dichte zijkant, doorgang achterin, bed bij het raam; lucht loopt achterlangs naar de afvoer."],
@@ -1933,7 +1943,7 @@ def write_text(path_a, path_b):
     BALK = m.YR - m.F1
     PLATE_H = m.ROOM_H - 4
     E_X = m.PART_X0 - m.F0
-    HOLE_L, HOLE_B = m.HOLE_X0 - m.F0, m.YB1 - m.HOLE_Y1
+    HOLE_L, HOLE_V = m.HOLE_X0 - m.F0, m.HOLE_Y0 - m.F0
     CAT_B = m.IN_Y1 - m.CAT_Y1
     VENT_R, VENT_Z = m.XR1 - m.VENT["x"], m.VENT["z"] - m.Z_UP
     OV_F, OV_B, OV_S = m.F0 - m.RAFT_Y0, m.RAFT_Y1 - m.YB1, m.F0 - m.SIDE_RAFT[0]
@@ -1951,7 +1961,7 @@ def write_text(path_a, path_b):
         ]),
         ("Zagen en voorbehandelen", [
             f"Zaag de balken en regels volgens blad T12 en schrijf op elk stuk het bouwdeel en de naam. Zaag de platen volgens blad T11 en de betonplex volgens blad T15 (jouw indeling, maten uit het model). Geef de bouwmarkt per plaat de zaagopdracht uit Kattenchalet_zaagplannen_bouwmarkt.pdf: daar staan alleen hun sneden, genummerd en met maat; PIR snijd je zelf. Laat grote platen in de vestiging voorzagen. Zaag alle wandplaten {PLATE_H} hoog in plaats van {m.ROOM_H}: ze komen 4 mm boven de vloer, met een kitvoeg, zodat ze geen water optrekken.",
-            f"Sparingen in wand E, gemeten vanaf de achterkant van de plaat (de verandaplaat is aan de voorkant langer). Plaat trapzijde: doorgang {m.CAT_Y1 - m.CAT_Y0} breed en {m.CAT_H} hoog vanaf de vloer, {CAT_B} mm uit de achterkant. Verandaplaat: geen doorgang, maar de uitsparing voor het kattenluik, {m.FLAP_W} breed en {m.FLAP_H} hoog, {m.IN_Y1 - m.FLAP_Y1} mm uit de achterkant, met de onderkant {m.FLAP_Z} mm boven de vloer. Meet de zaagmaat eerst na op het luik zelf. In de verandaplaat onder het luik ook een luchtinlaat van {m.VENT_W} x {m.VENT_H}, {m.IN_Y1 - m.VENT_E[1]} mm uit de achterkant, {m.VENT_E[2] - m.Z_DECK}-{m.VENT_E[3] - m.Z_DECK} mm boven de vloer. Ook die zaag je pas na het lijmen, door beide platen. Zaag uit de rest ook de versterkingsplaat van {m.CAT_Y1 - m.CAT_Y0} x {m.CAT_H}. Zaag de uitsparing voor het luik daarin pas na het lijmen (blad T14). Trapgat in de onderplaat en de vloerplaat van de tussenvloer: {HOLE} mm, {HOLE_L} mm uit de linkerrand en {HOLE_B} mm uit de achterrand. Teken elke sparing af met de plaat in de stand waarin hij straks zit. De onderplaat ligt met de gelakte kant naar beneden: teken je hem af met de lakzijde boven, dan wisselen links en rechts.",
+            f"Sparingen in wand E, gemeten vanaf de achterkant van de plaat (de verandaplaat is aan de voorkant langer). Plaat trapzijde: doorgang {m.CAT_Y1 - m.CAT_Y0} breed en {m.CAT_H} hoog vanaf de vloer, {CAT_B} mm uit de achterkant. Verandaplaat: geen doorgang, maar de uitsparing voor het kattenluik, {m.FLAP_W} breed en {m.FLAP_H} hoog, {m.IN_Y1 - m.FLAP_Y1} mm uit de achterkant, met de onderkant {m.FLAP_Z} mm boven de vloer. Meet de zaagmaat eerst na op het luik zelf. In de verandaplaat onder het luik ook een luchtinlaat van {m.VENT_W} x {m.VENT_H}, {m.IN_Y1 - m.VENT_E[1]} mm uit de achterkant, {m.VENT_E[2] - m.Z_DECK}-{m.VENT_E[3] - m.Z_DECK} mm boven de vloer. Ook die zaag je pas na het lijmen, door beide platen. Zaag uit de rest ook de versterkingsplaat van {m.CAT_Y1 - m.CAT_Y0} x {m.CAT_H}. Zaag de uitsparing voor het luik daarin pas na het lijmen (blad T14). Trapgat in de onderplaat en de vloerplaat van de tussenvloer: {HOLE} mm, {HOLE_L} mm uit de linkerrand en {HOLE_V} mm uit de voorrand. Teken elke sparing af met de plaat in de stand waarin hij straks zit. De onderplaat ligt met de gelakte kant naar beneden: teken je hem af met de lakzijde boven, dan wisselen links en rechts.",
             f"Hoeklatten: zaag op de tafelzaag eerst tong en groef van de Douglas-plank, dan 4 stroken 58 x 18 en 4 stroken 40 x 18, lang {m.CLAD_Z1-m.CLAD_Z0}. Zet per hoek de smalle kant van de 40-strook tegen de achterkant van de 58-strook, zodat een L van 58 x 58 ontstaat. Lijm met PU-lijm, schroef RVS 4 x 40 om de 250 mm, voorgeboord, en klem tot de lijm hard is. Rif de overige stroken (boeiboorden, kader, band, voorrand, regenluifel en de bovenste gevelrij van {m.TOP_STRIP}) volgens het Excel-tabblad 'Latten op lengte'. Meet eerst een plank: is die zonder tong en groef smaller dan 145, dan klopt die indeling niet meer.",
             "Beits alles vóór de montage, binnen en niet onder +8 °C. Gevelplanken, kader, band en voorrand krijgen eerst grondverf en dan grenen beits. Hoeklatten, boeiboorden en regenluifel krijgen antraciet, 3 lagen rondom. Beits 2 lagen, op plekken die veel weer vangen 3, met 8 uur tussen de lagen. Kopse kanten en gerifte randen krijgen kopshoutverzegeling. Maak eerst een proefstuk voor de kleur. Behandel later elke zaagsnede op de bouw na.",
             "Laat de Lightply 48 uur acclimatiseren, binnenshuis en vrij van de grond. Schuur de zichtzijde en lak die met TENCO Bootlak blank mat, minstens 3 lagen en 24 uur per laag. De achterkant wordt gelijmd en blijft kaal. Bij de onderplaat van de tussenvloer en de plafondplaat is de onderkant de zichtzijde. Rond de randen af en seal ze. Sla hout droog en plat op.",
@@ -1973,13 +1983,13 @@ def write_text(path_a, path_b):
             f"Bouw de frames C, D, E en F volgens blad T8: de regels over de koppen van de stijlen, 2 schroeven 5 x 80 per verbinding, voorgeboord. Lijm en schroef de binnenplaat erop, met de gelakte kant naar de kamer en de onderrand 4 mm boven de onderkant van het frame. Gebruik RVS 3,5 x 25, voorgeboord, om de 100 mm en minstens 15 mm uit de rand. De plaat maakt het frame haaks, dus controleer de diagonalen voordat de lijm uithardt. Bij D en aan de trapzijde van E steekt de plaat 13 mm voor het frame uit, tot tegen het kozijn. In de open veranda lopen de platen door tot 18 mm achter de voorkant, tegen de kaderstijl en de afdekking van de wandkop: bij F 22 mm voorbij het frame, aan de verandazijde van E 66 mm. Zet die laatste plaat pas vast als raamstijl B staat, en schroef de voorrand in de raamstijl. Kattenluik volgens blad T14: lijm de versterkingsplaat achter de verandaplaat, tussen de stijlen van de doorgang. Zaag daarna de uitsparing door beide platen tegelijk. Schroef het buitenframe zonder binnenframe vast met korte RVS-schroeven, zolang de wand nog plat ligt. Plak RVS-gaas aan de verandakant over de luchtinlaat onder het luik. Leg nog geen PIR in de wanden.",
             f"Zet C op de vloer, gelijk met de achterrand, en schroef de onderregel om de 300 mm met 5 x 80 door de vloerplaat in het frame. Zet D en F gelijk met de zijkanten en E met het regelwerk op {E_X} mm uit de linkerrand van de vloer. F loopt door tot de voorrand; D en E beginnen 44 mm erachter, want daar komen de raamstijlen. Tussen de raamstijlen links en rechts komt straks het onderraam, met 1 mm speling per kant; meet dat na aan het echte raam. Schroef ze op de vloer en schroef vanuit het open vak 3 schroeven 5 x 80 door de achterste stijl en de achterplaat in de achterwand.",
             "Raamstijlen B: de 44 x 69 links voor, tegen de voorste stijl van D, en de 44 x 69 voor wand E. Zet ze nu alleen voorlopig vast, met één schroef schuin in de vloer. Ze dragen straks de cassette, maar de definitieve bevestiging volgt pas in stap 11, strak tegen het kozijn.",
-            f"Trap. Zaag de trapbomen: teken de tanden af volgens detail 6 (optrede {round(m.RISE)}, treden {TREADS} diep; de voorste trede steekt 50 mm voor zijn tand uit), boor in elke binnenhoek een gat Ø6 tegen scheuren en zaag daarnaartoe, niet erlangs. Er blijft ca. {round(m.ST_CORNER)} mm hout over, dus zaag niet dieper dan de lijn. Schuur alles glad. Lijm de versterkingsstrook ({m.STRIP_L} x {m.STRIP_W}) met PU-lijm op de binnenkant van de rechterboom, langs de rechte onderkant, van de voet tot de achterkant. Klem hem en schroef om de 10-15 cm met RVS 3,5 x 20; er mag geen punt uitsteken. Bekleed de treden nu met sisal of rubber, want later kom je er slecht bij. Lijm de treden met PU-lijm op de tanden en zet ze vast met RVS 3,5 x 25, voorgeboord, midden in de boomrand.",
-            f"Zet de trap tegen de linkerwand, met de voet {m.ST_Y0 - m.F0} mm achter de voorrand van de vloer (5 mm achter het kozijn) en de bovenkant tegen de achterwand. Schroef de linkerboom met RVS 4 x 40 door de plaat in de stijlen van D en zet de voet van beide bomen schuin vast in de vloer. Maak schroefpunten aan de katkant nu onschadelijk. Na de tussenvloer is de trap niet meer uit te nemen.",
+            f"Trap. Zaag de trapbomen: teken de tanden af volgens detail 6 (optrede {round(m.RISE)}, treden {TREADS} diep, van onder naar boven; de onderste trede steekt 50 mm voorbij zijn tand, tot tegen de achterwand). Zaag aan de bovenkant van de rechterboom de lip mee uit ({m.TAB_Y1 - m.TAB_Y0} breed, tot {round(m.TAB_Z1 - m.Z_DECK)} boven de vloer); bij de linkerboom zaag je dat stuk weg. Zaag in de bovenste trede rechts een inkeping van {m.PLY_F} x {m.TAB_Y1 - m.TAB_Y0}, {m.TAB_Y0 - m.TREAD_AT[-1][0]} mm uit de voorkant, waar de lip doorheen gaat. Boor in elke binnenhoek een gat Ø6 tegen scheuren en zaag daarnaartoe, niet erlangs. Er blijft ca. {round(m.ST_CORNER)} mm hout over, dus zaag niet dieper dan de lijn. Schuur alles glad. Lijm de versterkingsstrook ({m.STRIP_L} x {m.STRIP_W}) met PU-lijm op de binnenkant van de rechterboom, langs de rechte onderkant, van de voet tot de bovenkant. Klem hem en schroef om de 10-15 cm met RVS 3,5 x 20; er mag geen punt uitsteken. Bekleed de treden nu met sisal of rubber, want later kom je er slecht bij. Lijm de treden met PU-lijm op de tanden en zet ze vast met RVS 3,5 x 25, voorgeboord, midden in de boomrand.",
+            f"Zet de trap tegen de linkerwand, met de voet tegen de achterwand C en de bovenkant {m.ST_Y0 - m.IN_Y0} mm achter het kozijn: de trap mag het raam niet raken. Schroef de linkerboom met RVS 4 x 40 door de plaat in de stijlen van D en zet de voet van beide bomen schuin vast in de vloer. De lip van de rechterboom steekt boven de wanden uit; zet de rechterkant van die boom precies {m.ST_X1 - m.F0} mm uit de linkerrand van de vloer, want de lip komt straks strak naast de balk rechts van het trapgat. Maak schroefpunten aan de katkant nu onschadelijk. Na de tussenvloer is de trap niet meer uit te nemen.",
         ]),
         ("Tussenvloer", [
-            f"Bouw cassette G volgens blad T6: de randen voor en achter over de koppen van de balken ({BALK}), 2 schroeven 5 x 80 per verbinding. Schroef de opvulstrook (44 x 69, op 25 mm gerift) tegen de linkerbalk en zet de raveelbalk tussen de opvulstrook en de balk rechts van het trapgat. Leg het frame ondersteboven. Lijm en schroef de onderplaat erop, met de gelakte kant naar beneden en het trapgat op zijn plek. Lijm de dagkanten (Lightply, 69 hoog) langs de linker- en achterkant van het trapgat.",
-            "Zet de cassette, nog zonder vloerplaat, met twee personen op de benedenwanden, rondom gelijk met de buitenkant. Schroef vanuit de open wandvakken om de 300 mm met 5 x 80 omhoog, door de bovenregels en de onderplaat in de randen en balken.",
-            "Leg PIR 70 tussen de balken; achter het trapgat komt een strook van 25 mm. Schuur de PIR zo nodig 1 mm vlak en tape de naden met alu-tape. Lijm en schroef de vloerplaat (betonplex, trapgat uitgezaagd) met RVS 4 x 40. Zet daarna de PIR in de benedenwanden C, D, E en F en tape de naden. In E komt ook PIR boven de latei. De lucht komt laag binnen, via de inlaat onder het luik.",
+            f"Bouw cassette G volgens blad T6: de randen voor en achter over de koppen van de balken ({BALK}), 2 schroeven 5 x 80 per verbinding. Schroef de opvulstrook (44 x 69, op 25 mm gerift) tegen de linkerbalk en zet de raveelbalk tussen de opvulstrook en de balk rechts van het trapgat. Leg het frame ondersteboven. Lijm en schroef de onderplaat erop, met de gelakte kant naar beneden en het trapgat op zijn plek. Lijm de dagkanten (Lightply, 69 hoog) langs de linker- en voorkant van het trapgat.",
+            "Zet de cassette, nog zonder vloerplaat, met twee personen op de benedenwanden, rondom gelijk met de buitenkant. Laat hem voorzichtig over de lip van de rechterboom zakken: die moet in het trapgat komen, tegen de balk rechts ervan. Schroef vanuit de open wandvakken om de 300 mm met 5 x 80 omhoog, door de bovenregels en de onderplaat in de randen en balken. Schroef daarna door het trapgat de lip met 2 RVS 4 x 40, voorgeboord, in die balk.",
+            "Leg PIR 70 tussen de balken, ook achter de raveelbalk van het trapgat. Schuur de PIR zo nodig 1 mm vlak en tape de naden met alu-tape. Lijm en schroef de vloerplaat (betonplex, trapgat uitgezaagd) met RVS 4 x 40. Zet daarna de PIR in de benedenwanden C, D, E en F en tape de naden. In E komt ook PIR boven de latei. De lucht komt laag binnen, via de inlaat onder het luik.",
         ]),
         ("Bovenwanden en kabels", [
             f"Bouw de frames I, J en K volgens blad T9, met de platen zoals beneden. Zaag in de achterplaat van I het gat voor de ventilatiebuis (Ø102, op de buismaat): hart {VENT_R} mm uit de rechterrand, gezien vanuit de kamer, en {VENT_Z} mm boven de vloer. Zet een extra regel of klos in wand K waar de beschermkap en de verwarmer komen: die horen in hout, niet in de 9 mm plaat.",
@@ -2247,7 +2257,7 @@ def write_store(path):
 
 
 def main():
-    probs = m.collisions() + m.window_clearance()
+    probs = m.collisions() + m.window_clearance() + m.stringer_clashes()
     if probs:
         sys.exit(f"Geometrieconflicten: {probs}")
     tmp = os.path.join(HERE, ".tmp")
