@@ -8,7 +8,7 @@
 # De bimetaalschakelaar van 45 °C in de mat staat los van deze software en blijft verplicht.
 
 substitutions:
-  i_min: "0.15"          # A: minimale stroomstap van één segment (nominaal 0,28 A)
+  i_min: "0.15"          # A: minimale stroomstap van één segment (nominaal 0,33 A)
   i_max: "0.45"          # A: maximale stroomstap
   t_seg_max: "42.0"      # °C: segment uit en vergrendeld
   t_mat_max: "45.0"      # °C: hele mat uit en vergrendeld
