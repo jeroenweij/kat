@@ -106,10 +106,13 @@ def mid(a, b):
 
 
 # balk- en stijlposities op gelijke vakken
-FLOOR_X = (F0, mid(F0, PART_X0), PART_X0, mid(PART_X1, XB), XB)   # vloerframe en achterwand beneden
-MID_X = (F0, HOLE_X1, PART_X0, FLOOR_X[3], XB)                         # tussenvloer
-BACK_U = tuple(round(F0 + i * (XB - F0) / 4) for i in range(5))        # achterwand boven, plafond, sporen
-SIDE_Y = (F1, mid(F1, IN_Y1 - S), IN_Y1 - S)                                # stijlen zijwanden
+# Ruime vakken (11-11-2026, keuze gebruiker): alleen de balken en stijlen die vastliggen, plus 4 plafondbalken en sporen
+FLOOR_X = (F0, PART_X0, XB)                                            # vloerframe, achterwand beneden en boven
+MID_X = (F0, HOLE_X1, PART_X0, XB)                                     # tussenvloer: rand, trapgat, scheidingswand, rand
+BACK_U = FLOOR_X                                                       # achterwand boven: stijlen boven die van beneden, voor de spouwlatten
+CEIL_X = tuple(round(F0 + i * (XB - F0) / 3) for i in range(4))        # plafond en sporen, ca. 365 hart op hart (11 mm OSB)
+SIDE_Y = (F1, IN_Y1 - S)                                               # stijlen zijwanden D, J, K: alleen voor en achter
+SIDE_LAT = mid(F1, IN_Y1 - S)                                          # middelste spouwlat zijwanden: in regels en randbalken, geen stijl
 
 
 def roof_z(y):
@@ -270,7 +273,7 @@ plate("Versterking kattenluik", g, PART_X1 - PLY, PART_X1, CAT_Y0, CAT_Y1, Z0, Z
       note="restplaat, achter de verandaplaat gelijmd tussen de stijlen; uitsparing na het lijmen, door beide platen")
 
 g = "F Rechterwand beneden"
-F_STUD = (F0, mid(F0, IN_Y1 - S), IN_Y1 - S)   # voorste stijl op de voorrand, middenstijl precies in het midden
+F_STUD = (F0, IN_Y1 - S)      # voorste stijl op de voorrand, achterste tegen de achterwand; geen middenstijl
 wall_y(g, XR0, XR1, F0, IN_Y1, Z0, F_STUD)
 for a, b in zip(F_STUD, F_STUD[1:]):
     add_pir("PIR wand", g, XR0, XR1, a + S, b, Z0 + S, Z1 - S)
@@ -304,7 +307,7 @@ add("Dagkant trapgat links", g, "LP9", XL1, IN_X0, HOLE_Y0, HOLE_Y1, Z_MID_J, Z_
 add("Raveelbalk trapgat", g, "B69", XL1, HOLE_X1, HOLE_Y1, HOLE_Y1 + S, Z_MID_J, Z_MID_T)
 add("Dagkant trapgat voor", g, "LP9", HOLE_X0, HOLE_X1, F1, HOLE_Y0, Z_MID_J, Z_MID_T)
 add_pir("PIR tussenvloer", g, XL1, HOLE_X1, HOLE_Y1 + S, YR, Z_MID_T - PIR, Z_MID_T)
-for xa, xb in ((HOLE_X1 + S, PART_X0), (PART_X0 + S, MID_X[3]), (MID_X[3] + S, XB)):
+for xa, xb in zip((HOLE_X1 + S, PART_X0 + S), (PART_X0, XB)):
     add_pir("PIR tussenvloer", g, xa, xb, F1, YR, Z_MID_T - PIR, Z_MID_T)
 
 # --- Bovenverdieping --------------------------------------------------------
@@ -322,8 +325,8 @@ add("Binnenplaat", g, "LP9", F0, XR1, IN_Y1, YB0, Z0, Z1, note="volle breedte: h
 for g, xa, xb, plya, plyb in (("J Linkerwand boven", F0, XL1, XL1, IN_X0),
                               ("K Rechterwand boven", XR0, XR1, IN_X1, XR0)):
     wall_y(g, xa, xb, F1, IN_Y1, Z0, SIDE_Y)
-    add_pir("PIR wand", g, xa, xb, SIDE_Y[0] + S, SIDE_Y[1], Z0 + S, Z1 - S)
-    add_pir("PIR wand", g, xa, xb, SIDE_Y[1] + S, SIDE_Y[2], Z0 + S, Z1 - S)
+    for a, b in zip(SIDE_Y, SIDE_Y[1:]):
+        add_pir("PIR wand", g, xa, xb, a + S, b, Z0 + S, Z1 - S)
     add("Binnenplaat", g, "LP9", plya, plyb, IN_Y0, IN_Y1, Z0, Z1)
 
 # --- Plafond en dak ---------------------------------------------------------
@@ -331,7 +334,6 @@ g = "L Plafond"
 add("Plafondplaat", g, "LP9", F0, XR1, F0, YB1, Z_U_TOP, Z_CEIL_J)
 add("Rand voor", g, "B69", F0, XR1, F0, F1, Z_CEIL_J, Z_RAFT)
 add("Rand achter", g, "B69", F0, XR1, YR, YB1, Z_CEIL_J, Z_RAFT)
-CEIL_X = BACK_U
 for x in CEIL_X:
     add("Balk", g, "B69", x, x + S, F1, YR, Z_CEIL_J, Z_RAFT)
 for a, b in zip(CEIL_X, CEIL_X[1:]):
@@ -471,7 +473,7 @@ g = "P Spouwlatten"
 ZC0, ZC1 = CLAD_Z0, CLAD_Z1
 for x in BACK_U:
     add("Lat achter", g, "LAT", x, x + S, YB1, YB1 + BAT, ZC0, ZC1)
-for y in (F0, SIDE_Y[1], YB0):
+for y in (F0, SIDE_LAT, YB0):
     add("Lat links", g, "LAT", CLAD, F0, y, y + S, ZC0, ZC1)
     add("Lat rechts", g, "LAT", XR1, XR1 + BAT, y, y + S, ZC0, ZC1)
 for x in (XL1 - S, XR0):
@@ -514,7 +516,7 @@ add("Regenluifel", g, "DK", 58, W - 58, -90, 0, Z_L_TOP + 12 - CANOPY_DROP, Z_L_
 WIN_U = dict(x0=WIN_X0, x1=WIN_X0 + WIN_U_W, y0=0, y1=WIN_D, z0=Z_UP, z1=Z_UP + WIN_H)
 WIN_L = dict(x0=WIN_X0, x1=WIN_X0 + WIN_L_W, y0=0, y1=WIN_D, z0=Z_DECK, z1=Z_DECK + WIN_H)
 SIGHT_U, SIGHT_L = 118, 101
-VENT = dict(x=mid(BACK_U[3] + S, BACK_U[4]), z=Z_U_TOP - S - 60, d=100)
+VENT = dict(x=1021, z=Z_U_TOP - S - 60, d=100)   # plek van voor 11-11-2026 gehouden: vrij van stijlen, latten en verwarming
 
 
 # --- Controles ---------------------------------------------------------------
