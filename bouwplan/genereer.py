@@ -10,7 +10,7 @@ import os
 import random
 import re
 import sys
-from collections import defaultdict
+from collections import Counter, defaultdict
 
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Font, PatternFill
@@ -512,12 +512,84 @@ def nest(items, w, h, kerf=4, rotate=True, tries=4000):
 
 
 # handelslengtes per lat met prijs uit de Inkoop-tab
-LONG_FIXED = {"B69": 5}   # mix uit de Inkoop-tab; andere mixen schelen maar een paar cent
-STOCK = {"R44": {3600: 5.29, 2400: 3.55}, "B69": {3600: 6.49, 3000: 5.40, 2400: 4.30}, "I69": {3600: 6.75},
+STOCK = {"R44": {3600: 5.29, 2400: 3.55}, "B69": {3600: 6.49, 2400: 4.30}, "I69": {3600: 6.75},
          "P69": {1800: 6.69}, "LAT": {2500: 5.49}}
 
 
-def bars(items, stocks, kerf=4, margin=10, n_fixed=None):
+def pack_exact(lens, stocks, kerf=4, margin=10, max_nodes=200_000):
+    """Exacte indeling van stuklengtes over de gegeven latten, of None. Per lat een combinatie van
+    aantallen per lengte; het totale zaagverlies mag het verschil tussen latten en stukken niet overschrijden."""
+    types = sorted(Counter(lens).items(), reverse=True)
+    need = [l + kerf for l, _ in types]
+    left = [n for _, n in types]
+    stocks = sorted(stocks, reverse=True)
+    caps = [s - margin + kerf for s in stocks]          # som(l) + kerf*(n-1) + margin <= lat
+    budget = sum(caps) - sum(q * n for q, n in zip(need, left))
+    if budget < 0:
+        return None
+    plan, nodes = [], [0]
+
+    def patterns(cap, k, upper):
+        """Aantallen vanaf lengte k die in cap passen; bij gelijke latten lexicografisch <= de vorige (symmetrie)."""
+        if k == len(need):
+            yield [], cap
+            return
+        top = min(left[k], cap // need[k])
+        if upper is not None:
+            top = min(top, upper[k])
+        for n in range(top, -1, -1):
+            sub = upper if (upper is not None and n == upper[k]) else None
+            for rest, r in patterns(cap - n * need[k], k + 1, sub):
+                yield [n] + rest, r
+
+    def go(b, waste):
+        if b == len(caps):
+            return not any(left)
+        nodes[0] += 1
+        if nodes[0] > max_nodes:
+            raise TimeoutError
+        upper = plan[-1] if b and stocks[b] == stocks[b - 1] else None
+        for pat, rest in patterns(caps[b], 0, upper):
+            if waste + rest > budget:
+                continue
+            left[:] = [a - n for a, n in zip(left, pat)]
+            plan.append(pat)
+            if go(b + 1, waste + rest):
+                return True
+            plan.pop()
+            left[:] = [a + n for a, n in zip(left, pat)]
+        return False
+
+    try:
+        if not go(0, 0):
+            return None
+    except TimeoutError:
+        return None
+    return [(s, [l for (l, _), n in zip(types, pat) for _ in range(n)]) for s, pat in zip(stocks, plan)]
+
+
+def bars(items, stocks, kerf=4, margin=10):
+    """Goedkoopste mix van lange en korte latten met een exacte indeling; anders de snelle indeling hieronder.
+    margin: tolerantie op de 'ca.'-lengte van Hornbach."""
+    if not items:
+        return []
+    lo, hi = min(stocks), max(stocks)
+    need = sum(l + kerf for l, _ in items)
+    mixes = sorted(((nl, ns) for nl in range(len(items) + 1) for ns in (range(len(items) + 1) if lo != hi else [0])
+                    if nl * (hi - margin + kerf) + ns * (lo - margin + kerf) >= need and (nl or ns)),
+                   key=lambda m_: (m_[0] * stocks[hi] + m_[1] * stocks[lo], m_[0] + m_[1]))
+    for nl, ns in mixes[:200]:
+        got = pack_exact([l for l, _ in items], [hi] * nl + [lo] * ns, kerf, margin)
+        if got:
+            names = defaultdict(list)
+            for l, name in sorted(items, key=lambda i: -i[0]):
+                names[l].append(name)
+            return [{"cuts": [(l, names[l].pop(0)) for l in cuts], "stock": s,
+                     "left": s - sum(cuts) - kerf * (len(cuts) - 1)} for s, cuts in got]
+    return bars_greedy(items, stocks, kerf, margin)
+
+
+def bars_greedy(items, stocks, kerf=4, margin=10, n_fixed=None):
     """Eerst n_long lange latten, daarna korte; houdt de goedkoopste indeling, of n_fixed lange. margin: tolerantie Hornbach."""
     if not items:
         return []
@@ -766,7 +838,7 @@ def collect():
     res = {}
     short = lambda r: r["group"][0] + ":" + r["name"]
     for key, stocks in STOCK.items():
-        res[key] = bars([(r["dims"][0], short(r)) for r in by[m.MAT[key]]], stocks, n_fixed=LONG_FIXED.get(key))
+        res[key] = bars([(r["dims"][0], short(r)) for r in by[m.MAT[key]]], stocks)
     res.update(plate_plans(by, short))
     res["PIR"] = nest([(r["dims"][0], r["dims"][1], short(r)) for r in by[m.MAT["PIR"]]], 1200, 600, kerf=2)
     res["DG"] = nest([(r["dims"][0], max(r["dims"][1], 145) if r["dims"][1] >= 100 else r["dims"][1], short(r)) for r in by[m.MAT["DG"]]], 3000, 145, kerf=4, rotate=False)
