@@ -284,18 +284,15 @@ def draw_project(view, select, key, proj, axis=None, cutfn=None):
 
 
 def foot(view, axis, xs):
-    """Poeren onder de tegels, terras en paalhouders (schematisch)."""
+    """Terras en Hettich-stelvoeten onder de poten (schematisch)."""
     u0 = min(a for a, _ in xs) - 250
     u1 = max(b for _, b in xs) + 250
-    for a, b in xs:
-        rect(view, (a + b) / 2 - 150, (a + b) / 2 + 150, -280, -60, C("#c9c9c9"))
     rect(view, u0, u1, -50, 0, C("#b9b4aa"))
     for a, b in xs:
         mid = (a + b) / 2
-        rect(view, mid - 8, mid + 8, -170, m.Z_POST - 4, C("#8d979c"))
-        rect(view, a - 2, b + 2, m.Z_POST - 4, m.Z_POST, C("#8d979c"))
-        rect(view, a - 2, a + 2, m.Z_POST, m.Z_POST + 100, C("#8d979c"))
-        rect(view, b - 2, b + 2, m.Z_POST, m.Z_POST + 100, C("#8d979c"))
+        rect(view, mid - m.FOOT_D / 2, mid + m.FOOT_D / 2, 0, m.FOOT_T, C("#8d979c"))
+        rect(view, mid - 5, mid + 5, m.FOOT_T, m.Z_POST, C("#8d979c"))
+        rect(view, mid - 8, mid + 8, m.Z_POST - 12, m.Z_POST - 4, C("#5a6268"))
 
 
 def window_front(view, w, sight):
@@ -1067,33 +1064,30 @@ def details_page(sh):
     dim(v, -150, -5, 0, -5, -5, "150", 5.8)
 
     # 4 fundering
-    detail_box(c, 14, 92, 130, 92, "4  Fundering (1:6, poer afgebroken getekend)")
-    v = View(c, 45, 127, 6)
-    rect(v, -150, 150, -200, -60, grey)
-    rect(v, -150, 150, -60, -50, C("#a8a8a8"))
-    rect(v, -190, 190, -50, 0, C("#b9b4aa"))
-    rect(v, -8, 8, -170, m.Z_POST - 4, C("#8d979c"))
-    rect(v, -34, 34, m.Z_POST, 180, FILL[m.MAT["P69"]])
-    rect(v, -38, 38, m.Z_POST - 4, m.Z_POST, C("#8d979c"))
-    rect(v, -38, -34, m.Z_POST, m.Z_POST + 100, C("#8d979c"))
-    rect(v, 34, 38, m.Z_POST, m.Z_POST + 100, C("#8d979c"))
-    rect(v, -44, 44, 58, 63, C("#5a6268"))
-    rect(v, -44, 44, 100, 105, C("#5a6268"))
-    rect(v, -60, 150, 180, 249, FILL[m.MAT["I69"]])
-    rect(v, -60, 150, 249, m.Z_DECK, floor18)
-    rect(v, 34, 150, 180 - m.OSB_T, 180, FILL[m.MAT["OSB"]])
-    rect(v, -100, -82, m.CLAD_Z0, m.Z_DECK, wood)
-    label(c, 15, 129, "terras", 5.5)
-    leader(v, 0, -130, 90, 101, "Poer 300x300x500 onder de tegel; op klei 700 diep")
-    leader(v, 150, -25, 90, 108, "Tegel in mortelbed; gat Ø25 rond de staaf, daarna kit")
-    leader(v, 0, -90, 90, 115, "Staaf Ø16 x 200 (aanname), 90-110 mm in het beton")
-    leader(v, 36, 90, 90, 122, "U-paalhouder 71, art. 3896646, thermisch verzinkt")
-    leader(v, 44, 60, 90, 129, "2 RVS bouten M10 door U en poot; speling opvullen")
-    leader(v, 0, 150, 90, 136, "Poot 68x68, nominaal 150; zaagvlak behandelen")
-    leader(v, 80, 215, 90, 143, "Frame 44x69 geïmpr., PIR 70; onderplaat OSB 11")
-    leader(v, 80, 255, 90, 150, "Betonplex 12, afschot 5 mm naar voren")
-    dim(v, 150, 0, 150, 180, 4, "180", 5.8)
-    label(c, 72, 96, "Elke poot trekvast verankeren: kantelgevaar bij storm.", 6.3, True)
+    detail_box(c, 14, 92, 130, 92, "4  Stelvoet onder de poot (1:4)")
+    v = View(c, 50, 106, 4)
+    rect(v, -60, 60, -30, 0, C("#b9b4aa"))
+    rect(v, -40, 40, -1, 0, C("#3a3a3a"))
+    rect(v, -m.FOOT_D / 2, m.FOOT_D / 2, 0, m.FOOT_T, C("#8d979c"))
+    rect(v, -5, 5, m.FOOT_T, m.Z_POST + 45, C("#8d979c"))
+    rect(v, -8, 8, m.Z_POST - 12, m.Z_POST - 4, C("#5a6268"))
+    rect(v, -12, 12, m.Z_POST - 1.5, m.Z_POST, C("#5a6268"))
+    rect(v, -34, 34, m.Z_POST, m.Z_LEG, FILL[m.MAT["P69"]])
+    rect(v, -6, 6, m.Z_POST, m.Z_POST + 60, colors.white, lw=0.3)
+    rect(v, -6, 6, m.Z_POST, m.Z_POST + 13, C("#5a6268"))
+    rect(v, -5, 5, m.Z_POST + 13, m.Z_POST + 45, C("#8d979c"))
+    rect(v, -60, 60, m.Z_LEG, m.Z_LEG + m.J, FILL[m.MAT["I69"]])
+    label(c, 25, 101, "terras", 5.5)
+    leader(v, 40, -0.5, 80, 101, "EPDM-rest onder de voet: grip, spaart de tegel")
+    leader(v, 30, 4, 80, 107, "Hettich stelvoet M10x75, Ø75, RVS (art. 4297033)")
+    leader(v, 8, m.Z_POST - 8, 80, 113, "RVS contramoer M10")
+    leader(v, 6, m.Z_POST + 6, 80, 119, "Inslagmoer M10 (art. 3857241), vet + kit")
+    leader(v, 6, m.Z_POST + 50, 80, 125, "Gat Ø11, 60 diep: ruimte voor de draad")
+    leader(v, 34, m.Z_POST + 75, 80, 131, f"Poot 68x68, {m.Z_LEG - m.Z_POST}; kopse kant verzegeld")
+    leader(v, 40, m.Z_LEG + 35, 80, 137, "Vloerframe 44x69 geïmpr.")
+    dim(v, -60, 0, -60, m.Z_POST, -4, str(m.Z_POST), 5.8)
+    dim(v, -60, 0, -60, m.Z_LEG, -10, str(m.Z_LEG), 5.8)
+    label(c, 72, 96, "Los op de tegels; later vast aan de schutting (stap 15).", 6.3, True)
 
     # 5 raam kop
     detail_box(c, 148, 92, 130, 92, "5  Raam binnenstebuiten, bovenkant beneden, verticaal (1:3)")
@@ -1301,8 +1295,8 @@ def bars_page(sh):
         "Schrijf bouwdeel en naam met potlood op elk stuk.",
         "Gelijke stukken (stijlen 417, balken 596) mogen onderling wisselen.",
         f"Sporen en zijsporen M: eerst op lengte {m.RAFT_L} zagen, daarna de schuine snede volgens T7.",
-        f"Poten A: hier nominaal {m.Z_LEG-m.Z_POST} mm; zaag elke poot pas op maat bij het stellen,",
-        "zodat de vloer waterpas komt.",
+        f"Poten A: alle 6 op {m.Z_LEG-m.Z_POST} mm; de stelvoeten vangen het afschot",
+        "van het terras op.",
         "Spouwlatten: hier als hele stukken getekend. Met een las op een regel of rand",
         "volstaan 9 latten (Excel, Inkoop); zaag dan de korte stukken uit de resten",
         "van de latten links, rechts en achter.",
@@ -1364,7 +1358,7 @@ def write_drawings(path):
     v = View(c, 40, 72, 10)
     view_title(c, tx("T2a"), 262, "Vooraanzicht")
     front_view(v)
-    dim(v, 0, 0, m.W, 0, -34, str(m.W))
+    dim(v, 0, 0, m.W, 0, -10, str(m.W))
     dim(v, m.ROOF_X0, m.Z_TOP, m.ROOF_X1, m.Z_TOP, 4, f"{m.ROOF_W} dak")
     dim(v, -100, 0, -100, m.Z_TOP, -8, str(round(m.Z_TOP)))
     for w, t in ((m.WIN_U, "Raam 1000 x 500, tussen de wanden"), (m.WIN_L, "Raam 500 x 500")):
@@ -1386,7 +1380,7 @@ def write_drawings(path):
     v = View(c, 370, 72, 10, flip=True)
     view_title(c, tx("T2b"), 262, "Achteraanzicht (van achteren gezien)")
     back_view(v)
-    dim(v, 0, 0, m.W, 0, -34, str(m.W))
+    dim(v, 0, 0, m.W, 0, -10, str(m.W))
     dim(v, -100, 0, -100, top, 8, str(top))
     for x0 in (tx("T2b"),):
         label(c, x0, 257.5, "Hoeklatten, boeiboorden en regenluifel in antraciet beits, de rest van de gevel met kader en band in grenen beits.", 6.3)
@@ -1399,13 +1393,13 @@ def write_drawings(path):
     v = View(c, 165, 72, 10, flip=True)
     view_title(c, tx("T3a"), 262, "Linkeraanzicht (voorzijde rechts), geen openingen")
     side_view(v, "L")
-    dim(v, 0, 0, m.D, 0, -34, str(m.D))
+    dim(v, 0, 0, m.D, 0, -10, str(m.D))
     dim(v, m.ROOF_Y0, m.Z_TOP, m.ROOF_Y1, m.Z_TOP, 3, f"{m.ROOF_L} dak")
     sh.page("Rechteraanzicht", win("T3b"))
     v = View(c, 240, 72, 10)
     view_title(c, tx("T3b"), 262, "Rechteraanzicht (voorzijde links), geheel dicht")
     side_view(v, "R")
-    dim(v, 0, 0, m.D, 0, -34, str(m.D))
+    dim(v, 0, 0, m.D, 0, -10, str(m.D))
     dim(v, m.ROOF_Y1, 0, m.ROOF_Y1, top, 4, f"achter {top}")
 
     # T4 doorsneden
@@ -1558,7 +1552,7 @@ def write_drawings(path):
     iso_draw(c, iso_boxes(dz=lambda p: offs.get(p.group[0], 0), skip=("P", "Q")), 95, 66, EXS)
     for t, z in (("5. Dakopbouw: sporen, OSB, EPDM, boeiboord, daktrim", 2650), ("4. Plafondcassette op de bovenwanden", 2340),
                  ("3. Vier bovenwanden op de tussenvloer", 1750), ("2. Tussenvloer als cassette op de benedenwanden", 1150),
-                 ("1. Benedenwanden en trap op het vloerframe", 700), ("0. Poeren, poten en vloerframe", 200)):
+                 ("1. Benedenwanden en trap op het vloerframe", 700), ("0. Stelvoeten, poten en vloerframe", 200)):
         label(c, 14, 66 + (z + 450) / EXS, t, 6.5, True)
     label(c, 14, 30, "Gevelfolie, spouwlatten, ramen en gevelplanken volgen als het casco staat en waterdicht is.", 6.5)
     label(c, 14, 26.5, "De ramen zijn hier niet getekend.", 6.5)
@@ -1855,12 +1849,11 @@ def purchase():
         ("Kit voor buitenaansluitingen en glaslatten, buitenkwaliteit", 1, "set", None, C_, "Geschikt voor kunststof"),
         ("5 RVS consoles voor regenluifel", 5, "st", None, C_, "Luifel over de hele breedte; bovenkant met EPDM-rest en druiprand"),
         ("Fundering", None, None, None, None, None),
-        ("Beton 25 kg (6 poeren 300x300x500 = 270 liter)", 24, "zak", None, C_, "Hoeveelheid van verpakking afhankelijk; meer op klei"),
-        ("KAISERTHAL U-paalhouder met betonanker 71x100x200, thermisch verzinkt (art. 3896646)", 6, "st", 2.95, "Hornbach, 6-11-2026", "In verse poer zetten. Treksterkte en inbouwdiepte niet opgegeven"),
-        ("RVS bout M10 x 100 met 2 ringen en moer", 12, "st", None, C_, "2 per poot; 3 mm speling in de U opvullen met ringen"),
-        ("Cementmortel 25 kg voor het tegelbed", 1, "zak", None, C_, ""),
-        ("Diamantboor Ø25 voor de tegels", 1, "st", None, C_, "Misschien te lenen"),
-        ("Reservetegels, zelfde als het terras", 6, "st", None, "Prijs nog opvragen", "Voor als het chalet later weggaat; formaat nog meten"),
+        ("HETTICH Stelvoet M10x75 mm Ø 75 mm RVS (art. 4297033)", 6, "st", 4.95, "Hornbach, 12-11-2026", "Los op de tegel, EPDM-rest eronder. 50 kg opgegeven (meubel). Verstelbereik meten"),
+        ("DRESSELHAUS Inslagmoer 10x13 mm galv. verzinkt, 4 stuks (art. 3857241)", 2, "pak", None, C_, "In de kopse kant van de poot; vet en kit tegen roest"),
+        ("RVS zeskantmoer M10 (contramoer)", 6, "st", None, C_, "Los uit de bak"),
+        ("Spanband met ratel, ca. 6 m", 1, "st", None, C_, "Tijdelijk bij code oranje wind, tot het chalet aan de schutting vast staat"),
+        ("Bevestiging aan de schutting: 2 afstandhouders 44x69 plus RVS hoekankers en schroeven", 1, "set", None, C_, "Uitwerken na het meten van de palen"),
         ("Verwarming en elektra", None, None, None, None, None),
         ("Buisverwarming 120 W (of 2x60 W) met maximaalthermostaat, IP44", 1, "st", None, C_, "Geschikt model niet bij Hornbach gevonden"),
         ("Digitale thermostaat, kast IP65, mantelbuis, voeler", 1, "set", None, C_, "Installateur kiest onderdelen"),
@@ -1890,7 +1883,7 @@ def write_text(path_a, path_b):
     A += [P("Kattenchalet", "title"), P("Bouwplan", "sub")]
     A += [P("Een modern houten buitenverblijf voor een kat die ook 's nachts buiten blijft. Twee verdiepingen: boven een geïsoleerde "
             "bovenkamer, beneden een trapkamer en een veranda met open voorkant. Toegang voor het onderhoud "
-            "via de ramen, die vanaf buiten opengaan. Het chalet staat op 6 betonpoeren op het terras, met de rug naar de schutting.")]
+            "via de ramen, die vanaf buiten opengaan. Het chalet staat op 6 stelvoeten los op het terras, met de rug naar de schutting, en wordt later aan de schutting vastgezet.")]
     A += [P("Hoofdmaten", "h2")]
     A += [T([["Onderdeel", "Maat (mm)"],
              ["Buitenmaat", f"{m.W} x {m.D}, hoogte {round(m.Z_TOP)}; dak {m.ROOF_W} x {m.ROOF_L}"],
@@ -1962,18 +1955,15 @@ def write_text(path_a, path_b):
             "Beits alles vóór de montage, binnen en niet onder +8 °C. Gevelplanken, kader, band en voorrand krijgen eerst grondverf en dan grenen beits. Hoeklatten, boeiboorden en regenluifel krijgen antraciet, 3 lagen rondom. Beits 2 lagen, op plekken die veel weer vangen 3, met 8 uur tussen de lagen. Kopse kanten en gerifte randen krijgen kopshoutverzegeling. Maak eerst een proefstuk voor de kleur. Behandel later elke zaagsnede op de bouw na.",
             "Laat de Lightply 48 uur acclimatiseren, binnenshuis en vrij van de grond. Schuur de zichtzijde en lak die met TENCO Bootlak blank mat, minstens 3 lagen en 24 uur per laag. De achterkant wordt gelijmd en blijft kaal. Bij de onderplaat van de tussenvloer en de plafondplaat is de onderkant de zichtzijde. Rond de randen af en seal ze. Sla hout droog en plat op.",
         ]),
-        ("Fundering", [
-            f"Kies de plek: achterwand minstens 250 mm van de schutting (dakoverstek 100 mm plus goot). Zet de hartmaten van de poten uit (blad T6): {LEG_DX[0]} en {LEG_DX[1]} mm in de breedte, {LEG_DY} mm in de diepte, diagonaal over de buitenste poten {LEG_DIAG} mm. Elke staaf moet minstens 50 mm van een tegelvoeg uitkomen; schuif het chalet zo nodig iets op. Controleer of er geen kabels of leidingen lopen. Bepaal met waterpas en rechte lat welke van de 6 staafplekken het hoogst ligt: dat is hoogte 0.",
-            "Maak een mal: schroef aan een rechte lat 3 korte stukken paal (uit de rest van de paal) op de hartmaten en bout daaraan de paalhouders. Neem de tegels van de voorste rij uit en boor op elke staafplek een gat Ø25 met een diamantboor.",
-            "Graaf 300 x 300 mm, 500 mm diep onder de tegel; op klei 700 mm om opvriezen te voorkomen. Stort beton tot 10 mm onder de onderkant van de tegel. Leg de tegel in een mortelbed op het verse beton, gelijk met de tegels ernaast.",
-            f"Druk de staven door de gaten in het verse beton en steun de lat op blokken. De bodem van elke U komt {m.Z_POST} mm boven hoogte 0, alle U's even hoog, waterpas en haaks. Het terras loopt af, dus aan de lage kant steekt de staaf verder uit: er moet overal minstens 90 mm staaf in het beton zitten.",
-            f"Laat uitharden en doe de achterste rij op dezelfde manier. Koppel de tweede lat aan de eerste rij: {LEG_DY} mm hart op hart en gelijke diagonalen. Kit de gaten rond de staven dicht. Laat alles minstens een week uitharden voordat het chalet erop komt. In die week kun je de frames uit stap 5 tot en met 9 al bouwen.",
-            "Later weghalen: bouten los, staaf onder de tegel doorslijpen en de geboorde tegels vervangen. Het beton blijft onzichtbaar onder het terras.",
+        ("Plek en stelvoeten", [
+            f"Kies de plek: achterwand minstens 250 mm van de schutting (dakoverstek 100 mm plus goot). De poten staan {LEG_DX[0]} en {LEG_DX[1]} mm hart op hart in de breedte en {LEG_DY} mm in de diepte (blad T6). Elke voet (Ø{m.FOOT_D}) moet helemaal op één tegel staan, niet op een voeg: schuif het chalet zo nodig iets op. Bepaal met waterpas en rechte lat welke van de 6 voetplekken het hoogst ligt: dat is hoogte 0. Meet ook hoeveel de laagste plek lager ligt.",
+            f"Controleer de stelvoeten in de winkel: draad M10 aan de voet, minstens 60 mm vrij te stellen. Het plan rekent met de onderkant van de poot {m.Z_POST} mm boven hoogte 0. Ligt de laagste plek meer dan ca. 25 mm lager, dan is de draad te kort: maak de poten aan die kant langer.",
+            f"Poten: zaag alle 6 op {m.Z_LEG - m.Z_POST} mm. Boor in het hart van elke kopse kant eerst een gat voor het busje van de inslagmoer, daarna Ø11 door tot 60 mm diep: daar verdwijnt de draad van de voet in. Verzegel de kopse kant en het gat. Vet de draad van de inslagmoer in, sla de moer erin en kit de rand rondom, zodat er geen water tussen hout en moer komt. Draai de contramoer en dan de voet in.",
+            "De voeten staan los op de tegels, met een stukje rest-EPDM onder elke voet. Het chalet wordt na de bouw aan de schutting vastgezet (stap 15). Tot die tijd: let op weerwaarschuwingen voor wind en zet het chalet bij code oranje tijdelijk vast (stap 15).",
         ]),
         ("Vloerframe", [
             f"Bouw frame A plat: de langsbalken voor en achter ({m.XR1 - m.F0}) over de koppen van de {len(m.FLOOR_X)} dwarsbalken ({BALK}), met 2 constructieschroeven 5 x 80 per verbinding, voorgeboord. Controleer de diagonalen ({FR_DIAG} mm). Schroef de OSB-onderplaat met RVS 4 x 40 onder het frame, zonder kieren. De plaat komt uit één stuk uit de rest van de dakplaat, met uitsparingen van 68 x 68 rond de 6 poten. Seal alle randen en lak of beits de onderkant. Keer het frame om, leg PIR 70 in de vakken en tape de naden.",
-            f"Poten: zaag de achterste 3 op {m.Z_LEG - m.Z_POST} mm en de voorste 3 op {m.Z_LEG - m.Z_POST - 5} mm. Zo krijgt de vloer 5 mm afschot naar voren, als de U's even hoog staan; meet dat per poot na. Behandel de zaagvlakken. Zet de poten in de U's, boor door de gaten van de U heen en bout elke poot met 2 RVS-bouten M10. Vul de speling van 3 mm op met ringen.",
-            "Zet het frame op de poten: in de breedte waterpas, in de diepte 5 mm aflopend naar voren. Het hele chalet helt daardoor iets naar voren, dus zet wanden en ramen haaks op de vloer en niet op de waterpas in de diepte. Zet elke poot trekvast aan het frame met een hoekanker en constructieschroeven. Dicht de uitsparingen rond de poten af, zodat er geen kier voor muizen overblijft. Lijm en schroef de vloerplaat met RVS 4 x 40 en verzegel alle randen.",
+            "Zet het frame op de poten met stelvoeten, op de plek uit stap 4. Stel de voeten af: in de breedte waterpas, in de diepte 5 mm aflopend naar voren. Elke voet moet dragen: druk op elke hoek en stel bij tot er geen voet meer los staat. Zet de contramoeren vast. Het hele chalet helt daardoor iets naar voren, dus zet wanden en ramen haaks op de vloer en niet op de waterpas in de diepte. Zet elke poot trekvast aan het frame met een hoekanker en constructieschroeven. Dicht de uitsparingen rond de poten af, zodat er geen kier voor muizen overblijft. Lijm en schroef de vloerplaat met RVS 4 x 40 en verzegel alle randen.",
         ]),
         ("Benedenwanden en trap", [
             f"Bouw de frames C, D, E en F volgens blad T8: de regels over de koppen van de stijlen, 2 schroeven 5 x 80 per verbinding, voorgeboord. Lijm en schroef de binnenplaat erop, met de gelakte kant naar de kamer en de onderrand 4 mm boven de onderkant van het frame. Gebruik RVS 3,5 x 25, voorgeboord, om de 100 mm en minstens 15 mm uit de rand. De plaat maakt het frame haaks, dus controleer de diagonalen voordat de lijm uithardt. Bij D en aan de trapzijde van E steekt de plaat 13 mm voor het frame uit, tot tegen het kozijn. In de open veranda lopen de platen door tot 18 mm achter de voorkant, tegen de kaderstijl en de afdekking van de wandkop: bij F 22 mm voorbij het frame, aan de verandazijde van E 66 mm. Zet die laatste plaat pas vast als raamstijl B staat, en schroef de voorrand in de raamstijl. Kattenluik volgens blad T14: lijm de versterkingsplaat achter de verandaplaat, tussen de stijlen van de doorgang. Zaag daarna de uitsparing door beide platen tegelijk. Schroef het buitenframe zonder binnenframe vast met korte RVS-schroeven, zolang de wand nog plat ligt. Plak RVS-gaas aan de verandakant over de luchtinlaat onder het luik. Leg nog geen PIR in de wanden.",
@@ -2006,7 +1996,7 @@ def write_text(path_a, path_b):
             "Voorkant: de latten onder beide ramen (band tussenvloer en voorrand vloer) komen met de bovenkant precies gelijk met de vloer, want het kozijn steunt erop. Onderbreek de lat boven het bovenraam in het midden over 10 mm voor de ventilatie. Laat de spouw onder en boven open en dek af met stroken RVS-gaas van ca. 40 mm breed, in een L gevouwen. Draag handschoenen; er mogen geen draadjes uitsteken.",
         ]),
         ("Ramen", [
-            "Schroef eerst de band tussenvloer (90 hoog) en de voorrand vloer (114 hoog) met RVS 4 x 40 op de latten, met de bovenkant gelijk met de vloer erachter. Laat links en rechts 58 mm vrij voor de hoeklatten.",
+            f"Schroef eerst de band tussenvloer (90 hoog) en de voorrand vloer ({m.Z_DECK - m.CLAD_Z0} hoog) met RVS 4 x 40 op de latten, met de bovenkant gelijk met de vloer erachter. Laat links en rechts 58 mm vrij voor de hoeklatten.",
             "Zaag het lekdorpelprofiel op 1070 en 600 mm, zodat het 35 mm (boven) en 50 mm (beneden) voorbij elke kant van het kozijn steekt, en maak de randen glad. Zet de staande zijde tegen de voorkant van de band of voorrand, met de bovenkant gelijk met de vloer en de schuine zijde naar buiten. Niet hoger, anders staat het kozijn scheef. Voorboor en schroef met RVS 3,5 x 25 om de 200 mm en kit de gaten. Kit ook de open kopjes dicht.",
             "Lijm de EPDM op de vloerplaat, over de bovenrand van de band en langs de staande zijde omlaag, tot minstens 10 mm op de schuine zijde. Laat achter een rand van 30 mm vrij, die straks achter het kozijn omhoog komt. Geen stelblokjes en geen dorpellat: het kozijn staat direct op de EPDM.",
             f"Plaats het raam binnenstebuiten, kozijn gelijk met de gevel, waterpas en haaks op de vloer. Schuif de stijlen links en rechts er strak tegenaan, met {m.WIN_GAP} mm speling per kant: gebruik een plaatje van {m.WIN_GAP} mm als maat en haal het daarna weg. Zet de stijlen nu definitief vast: onder en boven een hoekanker, en 2 schroeven 5 x 80 in de wandstijl erachter. Kies rechte stijlen, want een kromme stijl trekt het kozijn mee. In de kopvoeg van {m.WIN_JOINT} mm komt bij elk bevestigingspunt boven een wig van 6 mm. Meet of het kozijn recht blijft.",
@@ -2016,7 +2006,7 @@ def write_text(path_a, path_b):
         ]),
         ("Gevel", [
             "Monteer de hoeklatten op de hoeken (blad T2), met RVS 4 x 40 in de spouwlatten.",
-            f"Gevelplanken van onder naar boven, tong omhoog, stomp tegen de hoeklatten. De onderste plank komt 33 mm onder de onderkant van het vloerframe en loopt evenwijdig aan het frame. De bovenste rij is de gerifte strook van {m.TOP_STRIP} mm. Schroef met RVS 4 x 40 in de spouwlatten en boor voor aan de plankeinden. Zaag de planken achter rond de ventilatiebuis uit.",
+            f"Gevelplanken van onder naar boven, tong omhoog, stomp tegen de hoeklatten. De onderste plank komt {m.CLAD_OVER} mm onder de onderkant van het vloerframe en loopt evenwijdig aan het frame. Deze plank zit maar ca. {m.CLAD_Z0} mm boven de tegels en vangt spatwater: zaag de onderrand schuin af als druiprand, verzegel hem met kopshoutverzegeling en schroef de plank zonder lijm, zodat je hem later los kunt vervangen. De bovenste rij is de gerifte strook van {m.TOP_STRIP} mm. Schroef met RVS 4 x 40 in de spouwlatten en boor voor aan de plankeinden. Zaag de planken achter rond de ventilatiebuis uit.",
             "Voorkant: de kaderstijlen naast de ramen, het kader boven het bovenraam en de afdekking van de open wandkop van de veranda (blad T2). Plaats de regenluifel tussen de hoeklatten op 5 RVS-consoles, op ca. 30 cm afstand, 12 mm aflopend naar voren en met de achterkant tegen de band; kit die naad. Lijm een EPDM-rest over de bovenkant, met een druiprand aan de voorkant. Laat de lekdorpel van het bovenraam erboven vrij drupen. Controleer of de vleugels vrij blijven draaien.",
             "Schroef de onderplaten van het overstek (betonplex) onder de sporen, zijsporen en rijklossen. Houd 15 mm spleet tot de gevel en leg daar RVS-gaas in: hier ventileren spouw en dak.",
         ]),
@@ -2028,11 +2018,19 @@ def write_text(path_a, path_b):
             "Test 3 dagen zonder kat: temperatuur, vocht, condens, de kap en de stand van het rooster.",
             "Laat de kat wennen met de voeding op de veranda. Controleer de eerste weken de hygrometer, de goot en de wanden, en na elke harde bui de binnenzijde van de kozijnen.",
         ]),
+        ("Vastzetten aan de schutting", [
+            "Zet het chalet pas vast als alles af is en het zeker op de goede plek staat. Los op zijn voeten kan het bij een harde windstoot op de voorkant (rond 75-85 km/h op chalethoogte, berekening met aannames) achterover tegen de schutting kantelen, en bij harde wind van achteren of opzij naar voren. Met de ramen op het zuidoosten is dat zeldzaam, maar niet uitgesloten, vooral bij onweersbuien.",
+            "Tot het vast staat: kijk bij de weerberichten naar windwaarschuwingen. Bij code oranje voor wind zet je het chalet tijdelijk vast met een spanband: horizontaal om het chalet, ter hoogte van de tussenvloer, en om twee schuttingpalen. Leg hoekbeschermers of een doek onder de band op de hoeklatten, zodat de beits niet beschadigt. De schutting voorkomt kantelen naar achteren, de band kantelen naar voren.",
+            "Definitief: twee afstandhouders van geïmpregneerd 44 x 69 tussen de achterwand en de schuttingpalen, ter hoogte van de plafondrand. Aan de chalet-kant elk met 2 RVS constructieschroeven door gevelplank en spouwlat in een achterstijl; aan de schutting met een RVS hoekanker of bout in de bankirai-paal. Bankirai is erg hard: altijd voorboren. Valt er geen paal recht achter het chalet, schroef dan eerst een regel horizontaal over twee palen. De precieze uitvoering volgt na het meten van de palen (aanname, nog uit te werken).",
+            "Losmaken kan altijd: schroeven eruit, dan blijven er alleen gaatjes in de palen achter.",
+        ]),
     ]
     for i, (t, ss) in enumerate(steps, 1):
         Bd.append(KeepTogether([P(f"{i}. {t}", "h2")] + [B(s) for s in ss]))
     Bd += [PageBreak(), P("Onderhoud", "h1")]
     for t in ("Elk jaar voor de winter: kit, EPDM, trim, gootje, gaas en roosters nakijken; hygrometer vergelijken.",
+              "Onderste gevelplank en voet van de hoeklatten: elk jaar nakijken en zo nodig bijbeitsen; die krijgen spatwater van de tegels. De plank is los te vervangen.",
+              "Stelvoeten: elk jaar kijken of alle voeten nog dragen, of de contramoeren vast zitten en of er roest bij de inslagmoeren zit. Zolang het chalet niet vast staat: let op windwaarschuwingen (stap 15).",
               "Dak: niet op de plaat staan of er een ladder tegen zetten. Maak het schoon vanaf een trap ernaast.",
               "Ramen: elk seizoen de goot en buitennaden controleren, want daar zit het grootste risico. Regelmatig reinigen en het beslag twee keer per jaar smeren.",
               "Gevel: Douglas vraagt om regelmatig bijhouden. Hornbach adviseert onbehandeld Douglas om de 2 jaar te beitsen; voor de Hybride houtbeits noemt Hornbach tot 7 jaar bescherming, afhankelijk van weer en constructie. Controleer jaarlijks en herstel beschadigingen direct.",
@@ -2040,7 +2038,7 @@ def write_text(path_a, path_b):
         Bd.append(B(t))
     Bd += [P("Bronnen", "h2")]
     for t in (
-        "Hornbach-pagina's bekeken op 6-11-2026: kelderraam 12074105, ARON Basic+ 12331530, betonplex 12628592, Elliotis Pine 10000081, TENCO Bootlak 10728553 (met productinformatieblad), Premiumfol Bonding Adhesive 12218370, betonmortel 7195709, PIR 10368509, EPDM 10469549, daktrim 5581276, Douglas 10537457, vuren 5185884 en 5185888, antraciet beits 10277060, folie 7049802. U-paalhouder 3896646 met gegevensblad (as.80179845). Op 10-11-2026: LIGHTPLY multiplex 12575686 met verwerkingsvoorschrift (as.170091148).",
+        "Hornbach-pagina's bekeken op 6-11-2026: kelderraam 12074105, ARON Basic+ 12331530, betonplex 12628592, Elliotis Pine 10000081, TENCO Bootlak 10728553 (met productinformatieblad), Premiumfol Bonding Adhesive 12218370, betonmortel 7195709, PIR 10368509, EPDM 10469549, daktrim 5581276, Douglas 10537457, vuren 5185884 en 5185888, antraciet beits 10277060, folie 7049802. Op 10-11-2026: LIGHTPLY multiplex 12575686 met verwerkingsvoorschrift (as.170091148). Op 12-11-2026: Hettich stelvoet M10x75 Ø75 RVS 4297033 (belastbaarheid 50 kg, verstelbereik niet opgegeven) en Dresselhaus inslagmoer 10x13 3857241.",
         "KNMI: Windstotenklimatologie van Nederland (TR-306, 2009), figuren 5 en 7.",
         "ARON Basic+ 70 mm technisch blad en montageaanbeveling RC 1/RC 2 (Hornbach, as.187466783, as.187466663), door mij toegepast op een houten wand en op het kelderraam; maattekening kelderraam (as.91729658).",
         "IKO enertherm: Hornbach-productinformatie. Premiumfol: verwerkingsvoorschrift en handleiding via Hornbach.",

@@ -116,14 +116,10 @@ def results():
     F = q_wind * a_wind
     M_over = F * (height / 2 + 0.18)
     # kantelen om de lijwaartse poten: alleen de diepte van het vloerframe telt
-    leg_span = (m.LEG_Y[1][0] - m.LEG_Y[0][0]) / 1000
     M_stab = mass * 9.81 / 1000 * (m.YB1 - m.F0) / 2000
-    tension = max(M_over - M_stab, 0) / leg_span
-    poer_kg = 0.3 * 0.3 * 0.5 * 2300
-    leg_kg = tension / 3 * 1000 / 9.81           # trek per poot in de rij aan de loefzijde
-    # alleen betongewicht, 3 poeren dragen gelijk; tegel en grondwrijving tellen niet mee
-    M_anchor = 3 * poer_kg * 9.81 / 1000 * leg_span + M_stab
-    v_anchor = v_ref * math.sqrt(M_anchor / M_over)
+    # stelvoeten los op de tegels: alleen het eigen gewicht houdt het chalet staande.
+    # Naar achteren vangt de schutting (250 mm) het chalet op na enkele graden; vast aan de schutting
+    # kantelt het pas als de schutting bezwijkt.
     v_free = v_ref * math.sqrt(M_stab / M_over)  # kantelen zonder verankering
 
     # inwendige condensatie-grove controle op oppervlaktetemperatuur
@@ -141,8 +137,8 @@ def results():
     return dict(H=H, parts=hh["parts"], U=hh["U"], q_design=q_design, dT=dT, p_trans=p_trans,
                 p_vent=p_vent, peak=p_trans + p_vent, p_avg=p_avg, kwh=kwh_season, p_dec=p_dec,
                 wh_day_dec=wh_day_dec, wp_needed=wp_needed, batt_wh=battery_12v_100ah, batt_hours=batt_hours,
-                pv100=pv100, vent=vent_rows, mass=mass, F=F, M_over=M_over, M_stab=M_stab, tension=tension,
-                poer_kg=poer_kg, leg_kg=leg_kg, v_ref=v_ref, v_anchor=v_anchor, v_free=v_free, dew=dew, s_ins=surf(hh["U"]["wall_ins"]), s_wood=surf(hh["U"]["wall_wood"]),
+                pv100=pv100, vent=vent_rows, mass=mass, F=F, M_over=M_over, M_stab=M_stab,
+                v_ref=v_ref, v_free=v_free, dew=dew, s_ins=surf(hh["U"]["wall_ins"]), s_wood=surf(hh["U"]["wall_wood"]),
                 s_glass=surf(1.1))
 
 

@@ -39,9 +39,10 @@ XR0, XR1 = W - XL1, W - F0    # 1127, 1196: rechterwand regelwerk
 XB = XR1 - S                  # 1152: laatste balk of stijl, gelijk met de buitenkant
 YR = YB1 - S                  # 705: achterbalk vloer, tussenvloer en plafond 44 x 69 aan de buitenkant; balken lopen tot hier
 
-Z_POST = 30                   # hoogste tegel -> bodem U-paalhouder, onderkant poot
-Z_LEG = 180                   # hoogste tegel van het terras -> onderkant vloerframe
-Z_DECK0 = Z_LEG + J           # 249
+Z_POST = 35                   # hoogste tegel -> onderkant poot; Hettich stelvoet M10 eronder (los op de tegel)
+FOOT_D, FOOT_T = 75, 8        # schotel stelvoet: diameter, dikte (aanname, in de winkel meten)
+Z_LEG = 130                   # hoogste tegel van het terras -> onderkant vloerframe (12-11-2026: was 180, lagere instap voor de kat)
+Z_DECK0 = Z_LEG + J           # 199
 Z_DECK = Z_DECK0 + PLY_F      # 261: vloer beneden
 Z_L_TOP = Z_DECK + ROOM_H     # 766
 Z_MID_J = Z_L_TOP + PLY       # 775
@@ -58,9 +59,10 @@ ROOF_L, ROOF_W = ROOF_Y1 - ROOF_Y0, ROOF_X1 - ROOF_X0
 Z_TOP = Z_RAFT + RAFT_F + OSB_T + 1.2
 BOARD = 135                   # werkende breedte gevelplank
 CLAD_Z1 = Z_RAFT - SOF_T      # 1427: bovenkant bekleding, onder de overstekplaat
-CLAD_Z0 = Z_LEG - 33          # 147: 33 mm over het vloerframe heen
+CLAD_OVER = 15                # gevel loopt 15 mm onder het vloerframe door (was 33)
+CLAD_Z0 = Z_LEG - CLAD_OVER   # 115
 N_BOARD = (CLAD_Z1 - CLAD_Z0) // BOARD     # 9 hele planken, daarboven een gerifte strook
-TOP_STRIP = CLAD_Z1 - CLAD_Z0 - N_BOARD * BOARD   # 65
+TOP_STRIP = CLAD_Z1 - CLAD_Z0 - N_BOARD * BOARD   # 47
 
 # binnenvlakken
 IN_X0, IN_X1 = XL1 + PLY, XR0 - PLY        # bovenkamer links/rechts
